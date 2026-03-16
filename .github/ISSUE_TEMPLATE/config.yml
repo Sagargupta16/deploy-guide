@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Contributing Guidelines
-    url: https://github.com/SagarGupta007/deploy-guide/blob/main/CONTRIBUTING.md
+    url: https://github.com/Sagargupta16/deploy-guide/blob/main/CONTRIBUTING.md
     about: Read the contributing guidelines before submitting a guide
   - name: Guide Template
-    url: https://github.com/SagarGupta007/deploy-guide/blob/main/CONTRIBUTING.md#guide-template
+    url: https://github.com/Sagargupta16/deploy-guide/blob/main/CONTRIBUTING.md#guide-template
     about: Use this template when writing a new deployment guide
