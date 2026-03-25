@@ -1,6 +1,6 @@
 # Deploy Guide
 
-> Step-by-step deployment guides for every platform and framework. Stop reading docs for hours — deploy in minutes.
+> Step-by-step deployment guides for every platform and framework. Stop reading docs for hours - deploy in minutes.
 
 Whether you're deploying a React app, a FastAPI backend, or a full-stack MERN project, this repo has a battle-tested guide for it. Every guide includes actual commands, environment variable setup, custom domains, and troubleshooting.
 
