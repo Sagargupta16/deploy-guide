@@ -4,14 +4,14 @@
 
 Whether you're deploying a React app, a FastAPI backend, or a full-stack MERN project, this repo has a battle-tested guide for it. Every guide includes actual commands, environment variable setup, custom domains, and troubleshooting.
 
-**25+ guides** | **10 platforms** | **8 frameworks** | **5 databases** | **3 reference guides**
+**25+ guides** | **10 platforms** | **8 frameworks** | **4 databases** | **4 reference guides**
 
 ---
 
 ## Platforms
 
-| Platform | Guide | Free Tier | Best For |
-|----------|-------|-----------|----------|
+| Platform | Covers | Free Tier | Best For |
+|----------|--------|-----------|----------|
 | [GitHub Pages](guides/github-pages.md) | Static sites, SPAs | Unlimited | React, Vue, static HTML |
 | [Vercel](guides/vercel.md) | Frontend + serverless | Hobby (free) | Next.js, React, Svelte |
 | [Render](guides/render.md) | Full-stack apps | 750 hrs/mo | Node.js, Python, Docker |
@@ -20,12 +20,13 @@ Whether you're deploying a React app, a FastAPI backend, or a full-stack MERN pr
 | [Netlify](guides/netlify.md) | JAMstack, forms | 100 GB/mo | Static, serverless, forms |
 | [Cloudflare Pages](guides/cloudflare-pages.md) | Edge-first, full-stack | Unlimited bandwidth | Static, D1, KV, Workers |
 | [AWS ECS](guides/aws-ecs.md) | Production containers | 12-month free tier | Enterprise, Fargate |
+| [AWS Amplify](guides/aws-amplify.md) | Full-stack serverless | 1000 build min/mo | CI/CD, preview environments |
 | [DigitalOcean](guides/digitalocean.md) | VPS + App Platform | $200 credit | Self-hosted, full control |
 
 ## Frameworks
 
-| Framework | Guide | Recommended Platform |
-|-----------|-------|---------------------|
+| Framework | Covers | Recommended Platform |
+|-----------|--------|---------------------|
 | [React (Vite)](frameworks/react-vite.md) | SPA deployment | GitHub Pages / Vercel |
 | [Next.js](frameworks/nextjs.md) | SSR / SSG / ISR | Vercel |
 | [Express.js](frameworks/express.md) | Node.js backend | Render / Railway |
