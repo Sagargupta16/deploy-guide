@@ -6,7 +6,7 @@ Vercel is built by the creators of Next.js, making it the most streamlined deplo
 
 ## Prerequisites
 
-- [ ] [Node.js 18+](https://nodejs.org/) installed
+- [ ] [Node.js 20.9+](https://nodejs.org/) installed (22 or 24 LTS recommended; Next.js 16 no longer supports Node 18)
 - [ ] [Git](https://git-scm.com/downloads) installed
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] A [Vercel account](https://vercel.com/signup) (sign up with GitHub)
@@ -17,6 +17,7 @@ Vercel is built by the creators of Next.js, making it the most streamlined deplo
 
 ```bash
 npx create-next-app@latest my-nextjs-app
+# or with pnpm: pnpm create next-app my-nextjs-app
 cd my-nextjs-app
 ```
 
@@ -83,7 +84,7 @@ No GitHub Actions workflow needed. Vercel handles CI/CD natively.
 
 ## API Routes
 
-Next.js API routes are deployed as serverless functions on Vercel automatically.
+Next.js API routes are deployed as Vercel Functions automatically. They run on Fluid compute by default (enabled for all new projects since 2025-04-23), which gives in-function concurrency, bytecode caching, and automatic cold-start optimizations, with a 300s max duration on the Hobby plan.
 
 ### App Router (Recommended)
 
@@ -140,9 +141,11 @@ export default function handler(req, res) {
 
 ```bash
 vercel env add DATABASE_URL production
-vercel env add NEXT_PUBLIC_API_URL production preview development
+vercel env add NEXT_PUBLIC_API_URL   # No environment argument targets all environments
 vercel env pull .env.local   # Download to local for development
 ```
+
+The CLI accepts exactly one environment per `vercel env add` (a third argument is parsed as a git branch, not another environment). To target specific environments, run the command once per environment; omitting the environment targets all of them.
 
 ### Access in Code
 
@@ -153,6 +156,8 @@ const dbUrl = process.env.DATABASE_URL;
 // Client Component (must use NEXT_PUBLIC_ prefix)
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 ```
+
+**Tip:** If your pages query a database during the build (e.g. `generateStaticParams` or SSG page bodies), the same server env vars production needs at runtime must also exist at build time -- set them in the Vercel project env for all relevant environments. `NEXT_PUBLIC_*` values are baked into the client bundle at build time, so their build-time value is what ships to visitors.
 
 ---
 
@@ -170,13 +175,17 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
 | Type | Name | Value |
 |------|------|-------|
-| A | @ | 76.76.21.21 |
+| A | @ | Copy the IP shown in **Settings** > **Domains** |
+
+Vercel no longer uses a single static IP (the old `76.76.21.21` is legacy). Each project is assigned a recommended Anycast IP -- use the exact A record value shown in your project's Domain Settings.
 
 **For subdomain (`www.yourdomain.com`):**
 
 | Type | Name | Value |
 |------|------|-------|
-| CNAME | www | cname.vercel-dns.com |
+| CNAME | www | Copy the unique CNAME shown in **Settings** > **Domains** |
+
+CNAME targets are project-specific now (e.g. `d1d4fc829fe7bc7c.vercel-dns-017.com.`); the generic `cname.vercel-dns.com` is legacy. Copy the value from your project's Domains settings, including the trailing period.
 
 ### Step 3: SSL and Redirects
 
@@ -208,7 +217,13 @@ npm install
 
 - App Router: Ensure file is at `app/api/<route>/route.js` and exports named HTTP methods (`GET`, `POST`, etc.)
 - Pages Router: Ensure file is at `pages/api/<route>.js` and exports a default function
-- Check Vercel deployment logs under **Functions** tab
+- Check runtime logs in the dashboard: select your project, then open **Logs** in the sidebar (Hobby retains 1 hour of runtime logs)
+
+### Problem: Large uploads fail even after raising `bodySizeLimit`
+
+**Cause:** Two independent limits apply. Raising Next.js `experimental.serverActions.bodySizeLimit` (e.g. to `"25mb"`) lifts the app-level 1 MB default, but Vercel's platform cap on serverless request bodies (~4.5 MB) still applies.
+
+**Fix:** Keep individual requests under ~4.5 MB -- upload large batches a few files at a time, or upload directly from the client to object storage (S3/R2) and send only the resulting URL to your API route.
 
 ### Problem: Environment variable is undefined in client code
 

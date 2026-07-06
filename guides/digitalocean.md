@@ -8,7 +8,7 @@ DigitalOcean App Platform is a Platform-as-a-Service that builds and deploys you
 
 - [ ] A [DigitalOcean account](https://cloud.digitalocean.com/registrations/new) (new accounts get $200 free credit for 60 days)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] [Node.js 18+](https://nodejs.org/) or [Python 3.9+](https://www.python.org/downloads/) depending on your stack
+- [ ] [Node.js 22+](https://nodejs.org/) or [Python 3.12+](https://www.python.org/downloads/) depending on your stack
 - [ ] (Optional) [doctl CLI](https://docs.digitalocean.com/reference/doctl/how-to/install/) for command-line management
 - [ ] (Optional) [Docker](https://docs.docker.com/get-docker/) for container-based deployments
 
@@ -19,10 +19,10 @@ DigitalOcean App Platform is a Platform-as-a-Service that builds and deploys you
 brew install doctl
 
 # Ubuntu/Debian
-snap install doctl
+sudo snap install doctl
 
-# Windows (scoop)
-scoop install doctl
+# Windows: download the release archive from GitHub
+# https://github.com/digitalocean/doctl/releases
 
 # Authenticate
 doctl auth init
@@ -69,13 +69,13 @@ Create `package.json`:
   "name": "my-do-app",
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.0"
+    "express": "^5.2.0"
   }
 }
 ```
@@ -100,7 +100,7 @@ git push -u origin main
 5. App Platform auto-detects Node.js and configures:
    - **Build Command:** `npm install`
    - **Run Command:** `npm start`
-6. Choose a plan (Starter at $5/mo or Basic at $7/mo)
+6. Pick an instance size in the resource settings (the smallest container is 1 shared vCPU / 512 MiB at $5/mo)
 7. Click **Create Resources**
 
 Your app is live in a few minutes at `https://your-app-xxxxx.ondigitalocean.app`.
@@ -148,8 +148,8 @@ def health_check():
 Create `requirements.txt`:
 
 ```
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
+fastapi==0.139.0
+uvicorn[standard]==0.50.1
 ```
 
 ### Step 2: Push to GitHub and Deploy
@@ -259,9 +259,8 @@ static_sites:
 databases:
   - name: db
     engine: PG
-    version: "16"
-    size: db-s-dev-database
-    num_nodes: 1
+    version: "18"
+    production: false
 ```
 
 Deploy with doctl:
@@ -341,21 +340,21 @@ DigitalOcean offers managed databases that integrate directly with App Platform.
 
 1. Go to your app **Settings**
 2. Click **Add Resource** > **Database**
-3. Choose engine (PostgreSQL, MySQL, or Redis)
-4. Select a plan:
-   - **Dev Database:** $0 (shared, 1 GB, no standby -- good for development)
-   - **Production (Basic):** from $15/month (dedicated resources)
+3. Choose the database type:
+   - **Dev Database:** $7/mo (PostgreSQL only, 512 MiB, no standby -- good for development)
+   - **Production:** attach an existing managed cluster (PostgreSQL or MySQL from $15.15/mo)
 
 ### Add via app.yaml
 
 ```yaml
 databases:
   - name: db
-    engine: PG          # PG, MYSQL, or REDIS
-    version: "16"
-    size: db-s-dev-database    # Dev (free with app)
-    num_nodes: 1
+    engine: PG          # dev databases are PostgreSQL only
+    version: "18"
+    production: false   # dev database ($7/mo, auto-provisioned)
 ```
+
+For a production database, set `production: true` and point `cluster_name` at an existing managed cluster.
 
 ### Connect from Your App
 
@@ -444,14 +443,19 @@ doctl compute domain records create yourdomain.com \
 
 ## Pricing
 
-### App Platform Plans
+### App Platform Instance Sizes
 
-| Plan | vCPU | Memory | Price | Notes |
-|------|------|--------|-------|-------|
-| **Starter** | Shared | 512 MB | $5/mo | Basic apps, sleeps on inactivity |
-| **Basic** | 1 | 512 MB | $7/mo | Always-on, auto-deploy |
-| **Basic** | 1 | 1 GB | $12/mo | More memory |
-| **Professional** | 1 | 1 GB | $25/mo | Horizontal scaling, alerts |
+App Platform no longer uses Starter/Basic/Professional plan tiers -- you pay per container instance size. All instances are always-on (no sleep on inactivity). Common shared-CPU sizes:
+
+| Instance Slug | vCPU | Memory | Transfer | Price |
+|---------------|------|--------|----------|-------|
+| `apps-s-1vcpu-0.5gb` | 1 (shared) | 512 MiB | 50 GiB | $5/mo |
+| `apps-s-1vcpu-1gb-fixed` | 1 (shared) | 1 GiB | 100 GiB | $10/mo |
+| `apps-s-1vcpu-1gb` | 1 (shared) | 1 GiB | 150 GiB | $12/mo |
+| `apps-s-1vcpu-2gb` | 1 (shared) | 2 GiB | 200 GiB | $25/mo |
+| `apps-s-2vcpu-4gb` | 2 (shared) | 4 GiB | 250 GiB | $50/mo |
+
+Dedicated-CPU instances range from $29/mo to $392/mo.
 
 ### Free Credit
 
@@ -459,15 +463,17 @@ New DigitalOcean accounts receive **$200 in free credit** valid for 60 days. Thi
 
 ### Static Sites
 
-Static sites on App Platform have a free tier: 3 static sites, 1 GB bandwidth/month.
+Static sites on App Platform have a free tier: up to 3 static-site apps free (1 GiB transfer each). Additional static-site apps cost $3/mo.
 
 ### Managed Database Pricing
 
-| Engine | Dev (shared) | Basic (1 node) |
-|--------|-------------|----------------|
-| PostgreSQL | Free with app | from $15/mo |
-| MySQL | Free with app | from $15/mo |
-| Redis | Free with app | from $15/mo |
+| Engine | Dev (in-app) | Managed cluster (1 node) |
+|--------|-------------|--------------------------|
+| PostgreSQL | $7/mo (512 MiB) | from $15.15/mo |
+| MySQL | Not available as dev database | from $15.15/mo |
+| Valkey (Redis-compatible caching) | Not available as dev database | from $15/mo |
+
+DigitalOcean replaced Managed Redis with **Managed Caching for Valkey** (Redis-compatible). Dev databases attached to an app are PostgreSQL only.
 
 ---
 
@@ -495,7 +501,7 @@ DROPLET_IP=$(doctl compute droplet get my-server --format PublicIPv4 --no-header
 ssh root@$DROPLET_IP
 
 # On the Droplet: install Node.js
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 
 # Clone your app
@@ -565,7 +571,7 @@ git commit -m "Fix dependencies"
 git push
 
 # Specify Node.js version in package.json
-# "engines": { "node": ">=18" }
+# "engines": { "node": ">=22" }
 
 # Python: ensure requirements.txt is accurate
 pip freeze > requirements.txt
@@ -578,13 +584,13 @@ Check the build logs in the DigitalOcean dashboard: **App** > **Deployments** > 
 
 ### Problem: App exceeds resource limits (OOM killed)
 
-**Cause:** The application uses more memory than the plan allows.
+**Cause:** The application uses more memory than the instance size allows.
 
 **Fix:**
 
 1. Check resource usage in the **Insights** tab of your app
 2. Upgrade to a larger instance size:
-   - Dashboard: **Settings** > **Edit Plan**
+   - Dashboard: **Settings** > select the component > edit the instance size
    - Or update `instance_size_slug` in `app.yaml`
 3. Optimize your application's memory usage (connection pooling, streaming large files, etc.)
 

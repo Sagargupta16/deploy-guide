@@ -2,13 +2,13 @@
 
 > Deploy static sites, SPAs, and frontend apps for free with GitHub Pages.
 
-GitHub Pages serves static files directly from a GitHub repository. It supports custom domains, HTTPS, and automated deploys via GitHub Actions. Perfect for portfolios, documentation, and single-page applications.
+GitHub Pages serves static files directly from a GitHub repository. It supports custom domains, HTTPS, and automated deploys via GitHub Actions. Perfect for portfolios, documentation, and single-page applications. It is free, with soft limits: published sites up to 1 GB, 100 GB bandwidth per month, and 10 builds per hour for branch-based deploys (deploys via a custom GitHub Actions workflow are exempt from the build limit).
 
 ## Prerequisites
 
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] [Node.js 18+](https://nodejs.org/) (for React/Vue projects)
+- [ ] [Node.js 22+](https://nodejs.org/) (for React/Vue projects; Vite requires Node 20.19+ or 22.12+, and 24 is the current Active LTS)
 
 ## Deploy Static HTML
 
@@ -49,6 +49,14 @@ Your site will be live at `https://<username>.github.io/my-website/` within a fe
 npm create vite@latest my-react-app -- --template react
 cd my-react-app
 npm install
+```
+
+Or with pnpm:
+
+```bash
+pnpm create vite my-react-app --template react
+cd my-react-app
+pnpm install
 ```
 
 ### Step 2: Set the Base Path
@@ -92,6 +100,8 @@ GitHub Pages doesn't natively support client-side routing. Create a `public/404.
 </html>
 ```
 
+> **Tip:** A simpler alternative is to copy the built `index.html` to `404.html` in your deploy workflow (`cp dist/index.html dist/404.html` after the build step) -- Pages then serves your SPA for any deep link. If you use React Router's `BrowserRouter`, its `basename` must also match the Vite base (`<BrowserRouter basename="/my-react-app">`), or assets load but no routes match.
+
 ### Step 4: Deploy with GitHub Actions
 
 Create `.github/workflows/deploy.yml`:
@@ -116,17 +126,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
+
+      - uses: actions/configure-pages@v6
 
       - run: npm ci
       - run: npm run build
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -138,8 +150,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 ```
+
+> **Tip:** Using pnpm? Add a `pnpm/action-setup` step before `setup-node`, set `cache: pnpm`, and install with `pnpm install --frozen-lockfile` instead of `npm ci`.
 
 ### Step 5: Enable Pages with GitHub Actions Source
 
@@ -166,6 +180,8 @@ npm create vite@latest my-vue-app -- --template vue
 cd my-vue-app
 npm install
 ```
+
+Or with pnpm: `pnpm create vite my-vue-app --template vue`.
 
 ### Step 2: Set the Base Path
 
@@ -219,11 +235,11 @@ jobs:
   build-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci

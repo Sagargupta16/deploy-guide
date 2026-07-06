@@ -7,8 +7,8 @@ MongoDB Atlas is a fully managed cloud database service. The free tier (M0) give
 ## Prerequisites
 
 - [ ] A [MongoDB Atlas account](https://www.mongodb.com/cloud/atlas/register) (free)
-- [ ] [Node.js 18+](https://nodejs.org/) (for Node.js usage)
-- [ ] [Python 3.9+](https://www.python.org/downloads/) (for Python usage)
+- [ ] [Node.js 20.19+](https://nodejs.org/) (for Node.js usage; 22 or 24 LTS recommended)
+- [ ] [Python 3.12+](https://www.python.org/downloads/) (for Python usage)
 
 ---
 
@@ -16,7 +16,7 @@ MongoDB Atlas is a fully managed cloud database service. The free tier (M0) give
 
 1. Log in to [cloud.mongodb.com](https://cloud.mongodb.com/)
 2. Click **Build a Database** (or **Create** if you already have a project)
-3. Select **M0 FREE** tier
+3. Select the **Free** tier (M0)
 4. Choose a cloud provider and region (pick the one closest to your deployment platform):
    - **AWS** -- `us-east-1` works well with Render and Vercel
    - **GCP** or **Azure** -- also available
@@ -150,15 +150,20 @@ import mongoose from 'mongoose';
 const app = express();
 app.use(express.json());
 
-// Connect once at startup
-mongoose.connect(process.env.MONGODB_URI, { dbName: 'myapp' });
-
 app.get('/api/users', async (req, res) => {
   const users = await User.find();
   res.json(users);
 });
 
-app.listen(process.env.PORT || 3000);
+// Connect once at startup; only start listening after the DB is reachable.
+// Exiting on failure lets the platform restart the process instead of serving 500s.
+mongoose
+  .connect(process.env.MONGODB_URI, { dbName: 'myapp' })
+  .then(() => app.listen(process.env.PORT || 3000))
+  .catch((err) => {
+    console.error('MongoDB connection failed:', err);
+    process.exit(1);
+  });
 ```
 
 ---
@@ -168,8 +173,10 @@ app.listen(process.env.PORT || 3000);
 ### Install the Driver
 
 ```bash
-pip install pymongo[srv]
+pip install pymongo
 ```
+
+> Older guides say `pip install pymongo[srv]`. The `srv` extra was removed in PyMongo 4.8 -- plain `pymongo` now includes SRV support.
 
 ### Connect and Use
 
@@ -199,20 +206,22 @@ users.delete_one({"name": "Sagar Gupta"})
 client.close()
 ```
 
-### With Motor (Async Driver for FastAPI)
+### Async Usage (FastAPI)
+
+PyMongo ships a built-in async client (`AsyncMongoClient`) -- no extra package needed. The old async driver, Motor, was deprecated in May 2026 in favor of this API.
 
 ```bash
-pip install motor
+pip install pymongo
 ```
 
 ```python
 import os
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from fastapi import FastAPI
 
 app = FastAPI()
 
-client = AsyncIOMotorClient(os.environ["MONGODB_URI"])
+client = AsyncMongoClient(os.environ["MONGODB_URI"])
 db = client["myapp"]
 
 @app.get("/api/users")
@@ -312,6 +321,12 @@ async function connectDB() {
 }
 ```
 
+### Problem: Free cluster paused after a period of inactivity
+
+**Cause:** Atlas auto-pauses free (M0) clusters after 30 days with zero connections.
+
+**Fix:** Open the cluster in the Atlas UI and resume it. Any regular connection (a deployed app, a scheduled ping) prevents the pause.
+
 ### Problem: Free tier running out of storage
 
 **Cause:** M0 tier has a 512 MB limit.
@@ -321,4 +336,6 @@ async function connectDB() {
 1. Check usage in **Database** > **Metrics** > **Logical Size**
 2. Delete old or unnecessary data
 3. Add indexes to reduce storage overhead
-4. Upgrade to M2 ($9/month) or M5 ($25/month) for more storage
+4. Upgrade to a Flex cluster ($0.011/hour, usage-capped between $8/month and $30/month, 5 GB storage) or a Dedicated M10 cluster (from $0.08/hour, ~$57/month) for more storage
+
+> The old M2/M5 shared tiers no longer exist -- creation ended in February 2025 and all remaining M2/M5 clusters were migrated to Flex on January 22, 2026.

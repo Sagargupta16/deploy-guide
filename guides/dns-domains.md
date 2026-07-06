@@ -27,7 +27,7 @@ The Domain Name System (DNS) translates human-readable domain names (e.g., `myap
 |--------|---------|---------------|
 | **A** | Maps a domain to an IPv4 address | `185.199.108.153` |
 | **AAAA** | Maps a domain to an IPv6 address | `2606:50c0:8000::153` |
-| **CNAME** | Creates an alias pointing one domain to another | `cname.vercel-dns.com` |
+| **CNAME** | Creates an alias pointing one domain to another | `your-site.netlify.app` |
 | **MX** | Directs email to a mail server | `mail.example.com` (priority 10) |
 | **TXT** | Stores arbitrary text (SPF, DKIM, domain verification) | `v=spf1 include:_spf.google.com ~all` |
 | **NS** | Delegates a domain to specific name servers | `ns1.cloudflare.com` |
@@ -45,8 +45,8 @@ The Domain Name System (DNS) translates human-readable domain names (e.g., `myap
 | Registrar | Notes |
 |-----------|-------|
 | **Cloudflare Registrar** | At-cost pricing, integrated DNS and CDN, free SSL proxy, CNAME flattening for apex domains. Highly recommended if you use Cloudflare for DNS. |
-| **Namecheap** | Affordable, good UI, free WhoisGuard privacy. Popular with developers. |
-| **Google Domains** | Clean interface, integrated with Google Workspace. Transferred to Squarespace in 2023 but still operates similarly. |
+| **Namecheap** | Affordable, good UI, free Domain Privacy (formerly WhoisGuard). Popular with developers. |
+| **Squarespace Domains** | Absorbed Google Domains (acquired September 2023, all domains migrated by July 2024 -- Google Domains no longer operates). Clean interface. |
 | **GoDaddy** | Largest registrar. Functional but UI can be cluttered with upsells. |
 | **Porkbun** | Low prices, clean interface, growing in popularity among developers. |
 
@@ -77,29 +77,39 @@ GitHub Pages uses four A records for the apex domain and a CNAME for `www`.
 
 Then add your domain in the repository settings under **Pages > Custom domain**. GitHub will automatically provision a Let's Encrypt SSL certificate (may take up to 24 hours).
 
+**Tips:**
+- If your site has a build step (e.g. a framework static export to `out/` or `dist/`), the build does not emit the `CNAME` file -- copy it into the artifact in your deploy workflow (`cp public/CNAME out/CNAME`), or the site reverts to the default `*.github.io` URL on every deploy. Plain no-build repos just keep `CNAME` at the repo root.
+- When migrating a domain from GitHub Pages to another platform, remove all four `185.199.x` A records, not just one, before adding the new platform's records.
+
 ---
 
 ### Vercel
 
-Vercel uses a single CNAME record. For apex domains, Vercel supports A records as well.
+Vercel assigns unique DNS values per project -- there is no longer a universal A record IP or CNAME target. Copy the exact values shown in **Project Settings > Domains** after adding your domain.
 
 **Subdomain or www (`www.example.com`):**
 
 | Type | Name | Value |
 |------|------|-------|
-| CNAME | `www` | `cname.vercel-dns.com` |
+| CNAME | `www` | Unique per project, e.g. `d1d4fc829fe7bc7c.vercel-dns-017.com.` |
 
 **Apex domain (`example.com`):**
 
 | Type | Name | Value |
 |------|------|-------|
-| A | `@` | `76.76.21.21` |
+| A | `@` | IP shown in your dashboard (selected from an Anycast pool per plan and project) |
+
+Notes:
+- The CNAME value includes a trailing period -- copy it exactly as shown.
+- Vercel does not support IPv6, so do not add AAAA records.
 
 Add the domain via the Vercel dashboard (Project Settings > Domains) or CLI:
 
 ```bash
-vercel domains add example.com
+vercel domains add example.com my-project
 ```
+
+Without the project argument, the domain is only added to your account/team scope and is not attached to any project.
 
 SSL is provisioned automatically within minutes.
 
@@ -113,7 +123,15 @@ Render uses a CNAME pointing to your service's `.onrender.com` subdomain.
 |------|------|-------|
 | CNAME | `www` | `your-service.onrender.com` |
 
-For apex domains, Render provides specific instructions depending on your DNS provider. If your provider supports CNAME flattening (e.g., Cloudflare), you can CNAME the apex directly.
+**Apex domain (`example.com`):**
+
+| Type | Name | Value |
+|------|------|-------|
+| A | `@` | `216.24.57.1` |
+
+Point the apex at Render's anycast load balancer IP `216.24.57.1` via an A record. If your DNS provider supports ANAME/ALIAS records (or CNAME flattening, e.g. Cloudflare), you can alias the apex to your `.onrender.com` subdomain instead.
+
+Remove any AAAA records from your domain while configuring DNS -- Render is IPv4-only.
 
 Add the domain in your Render service's **Settings > Custom Domains** section. SSL certificates are provisioned automatically via Let's Encrypt.
 
@@ -131,20 +149,16 @@ Netlify supports both CNAME records and their special NETLIFY record type.
 
 **Option 2 - Netlify DNS (recommended for apex):**
 
-If you use Netlify as your DNS provider, they handle apex domains automatically with their `NETLIFY` record type. Point your nameservers to Netlify:
+If you use Netlify as your DNS provider, they handle apex domains automatically with their `NETLIFY` record type. Point your nameservers to Netlify. The name servers vary per domain (format `dns1.pXX.nsone.net`) -- copy the four values shown in the Netlify dashboard under **DNS > your domain > Name servers**.
 
-```
-dns1.p05.nsone.net
-dns2.p05.nsone.net
-dns3.p05.nsone.net
-dns4.p05.nsone.net
-```
+**Option 3 - ALIAS or A record for apex (external DNS):**
 
-**Option 3 - A record for apex:**
+Netlify recommends an ALIAS (flattened CNAME) record pointing to `apex-loadbalancer.netlify.com` if your DNS provider supports it. If not, fall back to an A record:
 
 | Type | Name | Value |
 |------|------|-------|
-| A | `@` | `75.2.60.5` |
+| ALIAS | `@` | `apex-loadbalancer.netlify.com` |
+| A (fallback) | `@` | `75.2.60.5` |
 
 SSL is automatic via Let's Encrypt.
 
@@ -152,15 +166,16 @@ SSL is automatic via Let's Encrypt.
 
 ### Railway
 
-Railway uses a CNAME record.
+Railway requires two DNS records per custom domain: a CNAME and a TXT record for domain-ownership verification. The domain will not verify with only the CNAME in place (requests 404 without the TXT record).
 
 | Type | Name | Value |
 |------|------|-------|
-| CNAME | `www` | Provided in Railway dashboard |
+| CNAME | `www` | Provided in Railway dashboard, format `[random].up.railway.app` (e.g. `g05ns7.up.railway.app`) |
+| TXT | Provided in dashboard | Provided in dashboard (ownership verification) |
 
-Add your custom domain in the Railway service settings. Railway generates a unique CNAME target for each service. SSL is automatic.
+Add your custom domain under **Service > Settings > Public Networking > + Custom Domain**. Railway generates a unique CNAME target for each service. SSL is automatic.
 
-For apex domains, use a DNS provider that supports CNAME flattening, or add an A record if Railway provides one in the dashboard.
+Railway does not provide A records for apex domains. Use a DNS provider with CNAME flattening (Cloudflare), dynamic ALIAS records (DNSimple, bunny.net), or switch your nameservers to Cloudflare.
 
 ---
 
@@ -190,7 +205,8 @@ Add the domain and request a certificate:
 
 ```bash
 fly certs add example.com
-fly certs show example.com   # check certificate status
+fly certs check example.com   # show certificate and DNS status
+fly certs list                # list all certificates
 ```
 
 ---
@@ -199,9 +215,11 @@ fly certs show example.com   # check certificate status
 
 If your domain already uses Cloudflare DNS, the setup is nearly automatic.
 
-1. Go to **Cloudflare Pages > your project > Custom domains**.
+1. Go to **Workers & Pages** in the Cloudflare dashboard, select your Pages project, then **Custom domains > Set up a domain**.
 2. Add your domain (apex or subdomain).
-3. Cloudflare automatically creates the DNS record for you.
+3. Cloudflare automatically creates the CNAME record for you.
+
+Do not add the CNAME record manually before associating the domain in the Pages dashboard -- doing so causes a 522 error.
 
 If your domain is NOT on Cloudflare DNS, you can still add a CNAME:
 
@@ -261,10 +279,10 @@ admin.example.com    -> Admin dashboard (Vercel or Railway)
 Each subdomain gets its own DNS record pointing to the appropriate platform:
 
 ```
-app     CNAME   cname.vercel-dns.com
+app     CNAME   <value from Vercel Project Settings > Domains>
 api     CNAME   api-service.onrender.com
 docs    CNAME   username.github.io
-staging CNAME   staging-app.railway.app
+staging CNAME   g05ns7.up.railway.app
 ```
 
 **CORS considerations:** When your frontend (`app.example.com`) calls your API (`api.example.com`), you need to configure CORS headers on the API:
@@ -331,7 +349,7 @@ nslookup -type=CNAME www.example.com
    ipconfig /flushdns
 
    # Linux (systemd-resolved)
-   sudo systemd-resolve --flush-caches
+   sudo resolvectl flush-caches
    ```
 
 ---
@@ -385,7 +403,7 @@ nslookup -type=CNAME www.example.com
 
 **Fixes:**
 1. Ensure you added the records to the correct domain/subdomain.
-2. Check for typos in CNAME targets (e.g., `cname.vercel-dns.com` not `cname.vercel-dns.com.` with trailing dot, though some providers add this automatically).
+2. Check for typos in CNAME targets. Copy values exactly as the platform dashboard shows them -- Vercel's per-project CNAME values include a trailing period that must be kept.
 3. Some platforms require a TXT record for verification. Check their docs.
 4. If using Cloudflare proxy (orange cloud), temporarily switch to DNS-only (grey cloud) during initial setup, then re-enable proxy after verification.
 
@@ -396,9 +414,9 @@ nslookup -type=CNAME www.example.com
 | Platform | Apex Domain | www / Subdomain | Auto SSL | Dashboard Path |
 |----------|-------------|-----------------|----------|----------------|
 | GitHub Pages | 4 A records | CNAME to `user.github.io` | Yes (Let's Encrypt) | Repo Settings > Pages |
-| Vercel | A to `76.76.21.21` | CNAME to `cname.vercel-dns.com` | Yes | Project > Settings > Domains |
-| Render | Provider-dependent | CNAME to `service.onrender.com` | Yes | Service > Settings > Custom Domains |
-| Netlify | A to `75.2.60.5` or Netlify DNS | CNAME to `site.netlify.app` | Yes | Site > Domain management |
-| Railway | CNAME flattening | CNAME (from dashboard) | Yes | Service > Settings > Domains |
+| Vercel | A (per-project IP from dashboard) | CNAME (per-project value from dashboard) | Yes | Project > Settings > Domains |
+| Render | A to `216.24.57.1` (or ANAME/ALIAS) | CNAME to `service.onrender.com` | Yes | Service > Settings > Custom Domains |
+| Netlify | ALIAS to `apex-loadbalancer.netlify.com` (A to `75.2.60.5` fallback) or Netlify DNS | CNAME to `site.netlify.app` | Yes | Site > Domain management |
+| Railway | CNAME flattening or ALIAS (no A record) | CNAME + TXT (from dashboard) | Yes | Service > Settings > Public Networking |
 | Fly.io | A (from `fly ips list`) | CNAME to `app.fly.dev` | Yes (`fly certs`) | CLI or dashboard |
-| Cloudflare Pages | Automatic (CF DNS) | CNAME to `project.pages.dev` | Yes | Pages > Custom domains |
+| Cloudflare Pages | Automatic (CF DNS) | CNAME to `project.pages.dev` | Yes | Workers & Pages > project > Custom domains |

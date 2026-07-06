@@ -6,7 +6,7 @@ This guide covers deploying a production-ready Django application to Render's fr
 
 ## Prerequisites
 
-- [ ] [Python 3.9+](https://www.python.org/downloads/) installed
+- [ ] [Python 3.12+](https://www.python.org/downloads/) installed
 - [ ] [Git](https://git-scm.com/downloads) installed
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] A [Render account](https://render.com/) (sign up with GitHub)
@@ -19,7 +19,14 @@ This guide covers deploying a production-ready Django application to Render's fr
 mkdir my-django-app && cd my-django-app
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install django gunicorn whitenoise dj-database-url psycopg2-binary python-dotenv
+pip install django gunicorn whitenoise dj-database-url "psycopg[binary]" python-dotenv
+```
+
+Or with [uv](https://docs.astral.sh/uv/) (faster drop-in for venv + pip):
+
+```bash
+uv venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+uv pip install django gunicorn whitenoise dj-database-url "psycopg[binary]" python-dotenv
 ```
 
 Create the Django project:
@@ -157,7 +164,6 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     CSRF_TRUSTED_ORIGINS = [
         f"https://{host.strip()}" for host in ALLOWED_HOSTS if host.strip()
@@ -264,13 +270,15 @@ pip freeze > requirements.txt
 Or manually create a minimal `requirements.txt`:
 
 ```
-django==5.1
-gunicorn==23.0.0
-whitenoise==6.8.2
-dj-database-url==2.3.0
-psycopg2-binary==2.9.10
-python-dotenv==1.0.1
+django==6.0.6
+gunicorn==26.0.0
+whitenoise==6.12.0
+dj-database-url==3.1.2
+psycopg[binary]==3.3.4
+python-dotenv==1.2.2
 ```
+
+Django 6.0 requires Python 3.12+. If you need the LTS line instead, pin `django==5.2.15` (Django 5.2 LTS, supported to April 2028, runs on Python 3.10-3.14). Django recommends psycopg 3 (`psycopg[binary]`); psycopg2 support is likely to be deprecated in a future release.
 
 Create `build.sh` (Render build script):
 
@@ -310,12 +318,14 @@ services:
           name: django-db
           property: connectionString
       - key: PYTHON_VERSION
-        value: "3.12.0"
+        value: "3.14.3"
 
 databases:
   - name: django-db
     plan: free
 ```
+
+Note: Render's free Postgres databases expire 30 days after creation (1 GB storage). For anything long-lived, use a paid plan (from $6/month) or a free [Neon](../guides/neon.md) database.
 
 Create `.gitignore`:
 
@@ -363,6 +373,8 @@ git push -u origin main
    - **Plan:** Free
 4. Copy the **Internal Database URL** (starts with `postgresql://`)
 
+Warning: free Render Postgres databases expire 30 days after creation and your app loses its database. Upgrade to a paid plan (Basic-256mb, $6/month) before the expiry, or use Option B for a free database that does not expire.
+
 ### Option B: Neon PostgreSQL
 
 Follow the [Neon guide](../guides/neon.md) to create a free PostgreSQL database and copy the connection string.
@@ -402,7 +414,7 @@ curl https://my-django-app.onrender.com/api/items/
 | `DEBUG` | Set to `False` in production | `False` |
 | `ALLOWED_HOSTS` | Comma-separated allowed hostnames | `my-django-app.onrender.com` |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host/db` |
-| `PYTHON_VERSION` | Python version for Render | `3.12.0` |
+| `PYTHON_VERSION` | Python version for Render (fully qualified) | `3.14.3` |
 
 ### Set on Render
 
@@ -443,35 +455,28 @@ Render provisions a free SSL certificate automatically once DNS propagates.
 
 ## Alternative Platforms
 
-### Vercel (with django-vercel adapter)
+### Vercel (zero-config)
 
-Vercel supports Django via serverless functions. Install the adapter:
+Vercel has zero-config Django support: it detects `manage.py`, resolves the entrypoint from `WSGI_APPLICATION`/`ASGI_APPLICATION` in your settings, runs `collectstatic` automatically when `STATIC_ROOT` is set (serving static files from the CDN), and deploys the app as a single Vercel Function on Fluid compute. No adapter package and no `builds`/`routes` config are needed -- just import the repo at [vercel.com](https://vercel.com/).
 
-```bash
-pip install django-vercel
-```
-
-Create `vercel.json`:
+Optional per-function config goes in `vercel.json` under `functions`, keyed by the entrypoint file:
 
 ```json
 {
-  "builds": [
-    { "src": "config/wsgi.py", "use": "@vercel/python" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "config/wsgi.py" }
-  ]
+  "functions": {
+    "config/wsgi.py": { "maxDuration": 60 }
+  }
 }
 ```
 
-Note: Vercel's serverless model works best for lightweight APIs. For full Django with admin, background tasks, or long-running requests, Render or Railway is a better fit.
+Note: the whole app runs as one Function, so Function limitations apply (500 MB standard bundle limit, no long-running background tasks). For Django with persistent workers or scheduled jobs, Render or Railway is a better fit.
 
 ### Railway
 
 1. Install the Railway CLI: `npm install -g @railway/cli`
 2. Login: `railway login`
 3. Initialize: `railway init`
-4. Add PostgreSQL: `railway add --plugin postgresql`
+4. Add PostgreSQL: `railway add --database postgres`
 5. Deploy: `railway up`
 
 Railway auto-detects Django projects and configures the build. Set `ALLOWED_HOSTS` and `SECRET_KEY` in the Railway dashboard.
@@ -587,3 +592,5 @@ If your Django project is in a subdirectory, adjust the Render **Root Directory*
 1. This is expected on the free tier (30-60 second cold start)
 2. Add the `/health/` endpoint for external uptime monitoring
 3. Upgrade to Starter ($7/month) for always-on
+
+Note: free web services also share 750 instance hours per workspace per month; when exhausted, all free services are suspended until the next month.

@@ -49,12 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -66,10 +66,10 @@ jobs:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v6
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -82,7 +82,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 ```
 
 **Prerequisites:**
@@ -109,12 +109,11 @@ Vercel has native Git integration, so you typically do NOT need a GitHub Actions
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "env": {
-    "NEXT_PUBLIC_API_URL": "@api-url"
-  }
+  "regions": ["iad1"]
 }
 ```
+
+Do not use the `env` property in `vercel.json` -- Vercel recommends against it (the `@secret-name` indirection is legacy Vercel Secrets). Define environment variables in Project Settings in the dashboard instead.
 
 **If you DO need a custom GitHub Actions workflow** (e.g., to run tests before deploying):
 
@@ -132,12 +131,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -146,12 +145,26 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Pull Vercel environment
+        run: npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build
+        run: npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
       - name: Deploy to Vercel
-        run: npx vercel deploy --prod --token ${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 ```
+
+This is Vercel's recommended flow: build in CI, then upload only the prebuilt artifacts (`--prebuilt`), so Vercel does not rebuild. For preview deploys, use `--environment=preview` in the pull step and drop `--prod` from build and deploy.
 
 **Getting Vercel credentials:**
 - `VERCEL_TOKEN`: Account Settings > Tokens > Create
@@ -179,12 +192,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -234,12 +247,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.14"
           cache: pip
 
       - name: Install dependencies
@@ -279,12 +292,31 @@ services:
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
-        value: "3.12"
+        value: "3.14"
       - key: DATABASE_URL
         fromDatabase:
           name: my-db
           property: connectionString
 ```
+
+**Tip: free-tier keep-alive.** Render free services sleep after 15 minutes of inactivity (and Neon free-tier database branches archive after 24 hours idle), causing cold starts of 15-25 seconds. A scheduled workflow that pings an unauthenticated health endpoint keeps them warm at near-zero cost:
+
+```yaml
+name: Keep Alive
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: curl --silent --max-time 30 https://your-app.onrender.com/health || echo "ignoring failure"
+```
+
+The `|| echo` keeps the job green on transient failures so you do not get noise from failed runs.
 
 ---
 
@@ -314,12 +346,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install and test
@@ -335,10 +367,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -401,12 +433,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install and test
@@ -419,7 +451,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Fly CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
@@ -479,12 +511,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -505,7 +537,7 @@ jobs:
       url: https://staging.example.com
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Deploy to Staging
         run: |
@@ -521,7 +553,7 @@ jobs:
       url: https://example.com
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Deploy to Production
         run: |
@@ -571,10 +603,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -594,7 +626,7 @@ Every pull request gets an automatic preview deployment. Vercel posts a comment 
 
 ### Netlify (Automatic)
 
-Same as Vercel. Netlify automatically creates deploy previews for PRs and posts a comment with the URL. Enable under Site > Build & deploy > Deploy notifications.
+Same as Vercel. Netlify automatically creates deploy previews for PRs (enabled by default, toggled under Project configuration > Build & deploy > Continuous deployment > Branches and deploy contexts). PR comments with the preview URL are configured under Project configuration > Notifications > Deploy notifications.
 
 ### Manual Preview Deploys (Other Platforms)
 
@@ -611,7 +643,7 @@ jobs:
   preview:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Fly CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
@@ -626,7 +658,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Comment PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.issues.createComment({
@@ -680,17 +712,21 @@ Caching dramatically speeds up CI builds by reusing downloaded dependencies.
 
 ```yaml
 - name: Setup Node.js
-  uses: actions/setup-node@v4
+  uses: actions/setup-node@v6
   with:
-    node-version: 20
+    node-version: 22
     cache: npm   # Automatically caches ~/.npm based on package-lock.json
 ```
+
+The `cache` input also supports `pnpm` and `yarn`. For pnpm, run `pnpm/action-setup@v4` BEFORE `setup-node` (the cache step fails if pnpm is not on PATH yet), then install with `pnpm install --frozen-lockfile`. Current pnpm is v11, which requires Node 22.13+.
+
+Tip: pin the Node version in `.nvmrc` and reference it with `node-version-file: ".nvmrc"` instead of `node-version` so CI and local never drift.
 
 Or manual cache control:
 
 ```yaml
 - name: Cache node_modules
-  uses: actions/cache@v4
+  uses: actions/cache@v6
   with:
     path: node_modules
     key: node-modules-${{ hashFiles('package-lock.json') }}
@@ -702,9 +738,9 @@ Or manual cache control:
 
 ```yaml
 - name: Setup Python
-  uses: actions/setup-python@v5
+  uses: actions/setup-python@v6
   with:
-    python-version: "3.12"
+    python-version: "3.14"
     cache: pip   # Automatically caches pip downloads based on requirements.txt
 ```
 
@@ -712,7 +748,7 @@ Or manual cache:
 
 ```yaml
 - name: Cache pip
-  uses: actions/cache@v4
+  uses: actions/cache@v6
   with:
     path: ~/.cache/pip
     key: pip-${{ hashFiles('requirements.txt') }}
@@ -720,14 +756,29 @@ Or manual cache:
       pip-
 ```
 
+### uv (Python, alternative)
+
+The [uv](https://docs.astral.sh/uv/) package manager has an official setup action with caching built in, replacing the setup-python + cache boilerplate:
+
+```yaml
+- name: Setup uv
+  uses: astral-sh/setup-uv@v8
+  with:
+    python-version: "3.14"
+    enable-cache: true
+
+- name: Install dependencies
+  run: uv sync
+```
+
 ### Docker Layer Caching
 
 ```yaml
 - name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@v3
+  uses: docker/setup-buildx-action@v4
 
 - name: Build and push
-  uses: docker/build-push-action@v6
+  uses: docker/build-push-action@v7
   with:
     context: .
     push: true
@@ -754,11 +805,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [22, 24]
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -774,11 +825,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.12", "3.13", "3.14"]
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -796,10 +847,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: [18, 20]
+        node-version: [22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -865,6 +916,7 @@ jobs:
 3. **Check the event:** `on: push` triggers on push; `on: pull_request` triggers on PR events. They are different.
 4. **Disabled workflows:** Go to Actions tab and check if the workflow is disabled.
 5. **Syntax error:** A YAML syntax error silently prevents the workflow from running. Validate with `actionlint` or the GitHub Actions VS Code extension.
+6. **Bot commits:** Pushes made by a workflow using the default `GITHUB_TOKEN` (e.g., a scheduled job committing generated files) never trigger `on: push` -- this prevents infinite loops. To chain workflows, use `on: workflow_run: { workflows: ["First Workflow"], types: [completed] }` in the second workflow and gate its jobs with `github.event.workflow_run.conclusion == 'success'`.
 
 ### Build Timeout
 

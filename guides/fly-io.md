@@ -2,14 +2,14 @@
 
 > Deploy containerized apps globally on Fly.io with multi-region support and built-in databases.
 
-Fly.io runs your applications in lightweight VMs (Firecracker micro-VMs) close to your users around the world. It uses Docker containers, supports multi-region deployments out of the box, and provides managed PostgreSQL and Redis. Fly.io is ideal for backend APIs, full-stack apps, and any workload that benefits from edge deployment.
+Fly.io runs your applications in lightweight VMs (Firecracker micro-VMs) close to your users around the world. It uses Docker containers, supports multi-region deployments out of the box, and provides Managed Postgres and Upstash Redis. Pricing is pure pay-as-you-go -- all new organizations require a credit card on file. Fly.io is ideal for backend APIs, full-stack apps, and any workload that benefits from edge deployment.
 
 ## Prerequisites
 
 - [ ] A [Fly.io account](https://fly.io/app/sign-up) (sign up with GitHub recommended)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] [Node.js 18+](https://nodejs.org/) (for Node.js projects)
-- [ ] [Python 3.9+](https://www.python.org/downloads/) (for Python projects)
+- [ ] [Node.js 22+](https://nodejs.org/) (for Node.js projects)
+- [ ] [Python 3.12+](https://www.python.org/downloads/) (for Python projects)
 - [ ] [Docker](https://docs.docker.com/get-docker/) installed locally (for building images)
 - [ ] [Fly CLI (flyctl)](https://fly.io/docs/flyctl/install/): `curl -L https://fly.io/install.sh | sh`
 
@@ -68,7 +68,7 @@ Create `package.json`:
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.0"
+    "express": "^5.2.0"
   }
 }
 ```
@@ -78,7 +78,7 @@ Create `package.json`:
 Create `Dockerfile`:
 
 ```dockerfile
-FROM node:20-slim
+FROM node:24-slim
 
 WORKDIR /app
 
@@ -107,12 +107,16 @@ npm-debug.log
 # Initialize the Fly app (generates fly.toml)
 fly launch
 
-# Fly will ask:
-# - App name: my-express-app (or auto-generated)
-# - Region: choose the closest region (e.g., iad for Virginia)
-# - PostgreSQL: No (unless you need it)
-# - Redis: No (unless you need it)
-# - Deploy now: Yes
+# Fly prints a default configuration summary:
+# - Organization, app name (derived from the directory), fastest region
+# - App Machines: shared-cpu-1x, 1GB RAM (the default VM)
+# - Postgres: <none>, Redis: <none>
+# Then asks a single question:
+# "Do you want to tweak these settings before proceeding?"
+# Answer Yes to adjust settings in the Fly Launch web page, or No to deploy as-is.
+
+# Non-interactive alternative:
+fly launch --name my-express-app --region iad --no-db --no-redis --now --yes
 ```
 
 `fly launch` creates a `fly.toml` configuration file and deploys your app. You get a URL like `https://my-express-app.fly.dev`.
@@ -156,8 +160,8 @@ def health_check():
 Create `requirements.txt`:
 
 ```
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
+fastapi==0.139.0
+uvicorn[standard]==0.50.1
 ```
 
 ### Step 2: Create a Dockerfile
@@ -165,7 +169,7 @@ uvicorn[standard]==0.27.0
 Create `Dockerfile`:
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
@@ -261,39 +265,40 @@ primary_region = "iad"
 
 ## PostgreSQL on Fly
 
-### Create a Postgres Cluster
+The current product is **Fly.io Managed Postgres (MPG)**, managed via the `fly mpg` commands. The old unmanaged Fly Postgres (`fly postgres create`) is legacy and unsupported -- Fly's docs state they cannot provide support or guidance for it. `fly launch --db mpg` provisions Managed Postgres during launch (`--db upg` or `--db legacy` keeps the old unmanaged path).
+
+Managed Postgres starts at the Basic plan: $38/mo (shared 2x CPU, 1GB RAM) plus $0.28 per provisioned GB of storage per 30-day month, available in 12 regions.
+
+### Create a Managed Postgres Cluster
 
 ```bash
-# Create a Postgres database attached to your app
-fly postgres create --name my-app-db
+# Create a Managed Postgres cluster (interactive: name, region, plan)
+fly mpg create
 
 # Attach it to your app (sets DATABASE_URL automatically)
-fly postgres attach my-app-db --app my-express-app
+fly mpg attach --app my-express-app
 ```
 
-This provisions a PostgreSQL cluster and automatically sets the `DATABASE_URL` secret in your app.
+This provisions a Managed Postgres cluster and automatically sets the `DATABASE_URL` secret in your app.
 
 ### Connect Locally
 
 ```bash
 # Proxy the database to localhost for local development
-fly proxy 5432 -a my-app-db
+fly mpg proxy
 
-# Connect with psql
+# Connect with psql using the connection string shown by the proxy
 psql "postgres://postgres:password@localhost:5432/my_app_db"
 ```
 
 ### Manage the Database
 
 ```bash
-# Connect to the Postgres console
-fly postgres connect -a my-app-db
-
-# List databases
-fly postgres db list -a my-app-db
+# Open a psql console on the cluster
+fly mpg connect
 
 # Check cluster status
-fly status -a my-app-db
+fly mpg status
 ```
 
 ---
@@ -310,10 +315,15 @@ fly redis create
 # - Name: my-app-redis
 # - Region: same as your app
 # - Eviction: enabled or disabled
-# - Plan: Free (25MB)
+# - Plan: pay-as-you-go ($0.20 per 100K requests, 10GB storage cap)
+#   or a fixed plan ($10/mo for 250MB up to $400/mo for 50GB)
 ```
 
-This sets the `REDIS_URL` (or `FLY_REDIS_CACHE_URL`) secret in your app.
+The command prints a private connection URL (e.g. `redis://password@fly-my-app-redis.upstash.io`). Set it as a secret yourself:
+
+```bash
+fly secrets set REDIS_URL="redis://password@fly-my-app-redis.upstash.io"
+```
 
 ### Use in Your App
 
@@ -357,14 +367,13 @@ fly machine clone --region nrt
 fly machine clone --region sin
 ```
 
-### Primary Region and Read Replicas
+### Primary Region and Databases
 
-For databases, use a primary region for writes and read replicas in other regions:
+Keep your database in (or close to) your app's primary region for write latency. Managed Postgres is available in 12 regions -- pick the region when running `fly mpg create`:
 
 ```bash
-# Create Postgres with read replicas
-fly postgres create --name my-app-db --region iad
-fly postgres create --name my-app-db-replica --region lhr
+fly mpg create
+# Choose the same region as your app's primary_region (e.g., iad)
 ```
 
 ### fly.toml Multi-Region Example
@@ -387,7 +396,7 @@ Fly.io uses `fly secrets` for sensitive environment variables and the `[env]` se
 |----------|-------------|---------|
 | `PORT` | Server port (set via `internal_port`) | `3000` |
 | `DATABASE_URL` | PostgreSQL connection string (auto-set) | `postgres://user:pass@host/db` |
-| `REDIS_URL` | Redis connection string (auto-set) | `redis://default:pass@host:6379` |
+| `REDIS_URL` | Redis connection string (set manually from `fly redis create` output) | `redis://default:pass@host:6379` |
 | `SECRET_KEY` | App secret key | `your-secret-key-here` |
 | `NODE_ENV` | Node environment | `production` |
 | `FLY_REGION` | Current region (auto-set by Fly) | `iad` |
@@ -476,26 +485,25 @@ Fly automatically provisions and renews SSL certificates via Let's Encrypt once 
 
 ---
 
-## Free Tier
+## Pricing
 
-Fly.io offers a generous free allowance (no credit card required for basic usage):
+Fly.io no longer offers free allowances or plans to new customers -- new organizations are pure pay-as-you-go, and all organizations require a credit card on file. (The old free allowances, like 3 shared-cpu-1x 256MB VMs, apply only to grandfathered legacy accounts.)
 
-| Feature | Free Allowance | Notes |
-|---------|---------------|-------|
-| **Shared CPU VMs** | Up to 3 shared-cpu-1x VMs (256MB each) | Always available |
-| **Outbound Bandwidth** | 160 GB/month | Across all apps |
-| **Anycast IPs** | Unlimited shared IPv4, 1 dedicated IPv4 | Shared IPv4 is free |
-| **Certificates** | 10 active SSL certificates | Auto-provisioned |
-| **Postgres** | 1 single-node cluster (256MB, 1GB disk) | Shared CPU |
-| **Upstash Redis** | 25MB, 200 connections | Via Fly partnership |
-| **Builders** | Unlimited remote builders | For Docker builds |
+| Feature | Price | Notes |
+|---------|-------|-------|
+| **Shared CPU VMs** | shared-cpu-1x 256MB from ~$2.02/mo | Billed per second while running |
+| **Outbound Bandwidth** | $0.02-$0.12/GB by region | Inbound is free |
+| **Anycast IPs** | Shared IPv4 free; dedicated IPv4 $2/mo | IPv6 is free |
+| **Certificates** | First 10 single-hostname SSL certs free, then $0.10/mo each | Auto-provisioned |
+| **Managed Postgres** | Basic plan from $38/mo + $0.28/GB storage per 30-day month | Shared 2x CPU, 1GB RAM |
+| **Upstash Redis** | Pay-as-you-go $0.20 per 100K requests; fixed plans $10-$400/mo | Via Fly partnership |
 
 ### Key things to know:
 
 - **Machines auto-stop by default.** When `auto_stop_machines = "stop"` is set, idle machines stop and restart on incoming requests (cold start of ~1-3 seconds).
-- **The free tier does not spin down permanently.** Machines stop when idle but restart automatically on traffic.
-- **Exceeding the free allowance** requires adding a credit card. You will not be charged without explicit action.
-- **Free Postgres is a single node** -- not suitable for production. Use Fly Postgres with multiple nodes for HA.
+- **Stopped machines cost almost nothing.** You pay only for rootfs storage while a machine is stopped, so auto-stop keeps low-traffic apps cheap.
+- **A credit card is required** for all new organizations before you can deploy.
+- **The Managed Postgres Basic plan is a starting point** -- scale the plan up for production HA workloads.
 
 ---
 
@@ -581,7 +589,7 @@ fly releases
 
 ### Problem: OOM (Out of Memory) kills
 
-**Cause:** The app exceeds the allocated memory for the VM. The default is 256MB for shared-cpu VMs.
+**Cause:** The app exceeds the allocated memory for the VM. `fly launch` defaults to shared-cpu-1x with 1GB RAM, but smaller configs (e.g., 256MB) hit this quickly.
 
 **Fix:**
 
@@ -617,7 +625,7 @@ fly ssh console -C "free -m"
 
 ```bash
 fly scale vm shared-cpu-2x   # 512MB RAM
-fly scale vm performance-1x  # 2GB RAM (paid)
+fly scale vm performance-1x  # 2GB RAM
 ```
 
 ### Problem: Volume mounting issues

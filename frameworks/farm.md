@@ -6,8 +6,8 @@ This guide covers deploying a complete FARM stack application: a React + Vite fr
 
 ## Prerequisites
 
-- [ ] [Python 3.9+](https://www.python.org/downloads/) installed
-- [ ] [Node.js 18+](https://nodejs.org/) installed
+- [ ] [Python 3.12+](https://www.python.org/downloads/) installed
+- [ ] [Node.js 22+](https://nodejs.org/) installed
 - [ ] [Git](https://git-scm.com/downloads) installed
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] A [Render account](https://render.com/) (sign up with GitHub)
@@ -21,11 +21,13 @@ This guide covers deploying a complete FARM stack application: a React + Vite fr
 GitHub Pages (Frontend)          Render (Backend)             MongoDB Atlas (Database)
 +------------------+            +------------------+          +------------------+
 |  React + Vite    | -- API --> |  FastAPI          | ------> |  MongoDB         |
-|  Static SPA      |   calls   |  async + Motor    |         |  Cloud database  |
-|  Axios HTTP      |            |  Pydantic models  |         |  Free M0 tier    |
+|  Static SPA      |   calls   |  async + PyMongo  |         |  Cloud database  |
+|  Axios HTTP      |            |  Pydantic models  |         |  Free tier (M0)  |
 +------------------+            +------------------+          +------------------+
      VITE_API_URL                   MONGODB_URI
 ```
+
+> **Alternative:** You can collapse frontend and backend into a single service by building the React app into the backend tree and having FastAPI serve it: `app.mount("/", StaticFiles(directory="client_build", html=True), name="frontend")`, with API routes under an `/api` prefix so they do not collide. One URL, no CORS in production, and it fits in a single free-tier Render service.
 
 ---
 
@@ -33,7 +35,7 @@ GitHub Pages (Frontend)          Render (Backend)             MongoDB Atlas (Dat
 
 Follow the [MongoDB Atlas guide](../guides/mongodb-atlas.md) to:
 
-1. Create a free M0 cluster
+1. Create a Free cluster (the free tier, formerly M0)
 2. Create a database user
 3. Whitelist all IPs (`0.0.0.0/0`) for Render access
 4. Copy your connection string
@@ -55,13 +57,23 @@ mkdir farm-app && cd farm-app
 mkdir server && cd server
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install fastapi uvicorn[standard] motor pydantic-settings python-dotenv
+pip install fastapi uvicorn[standard] pymongo pydantic-settings python-dotenv
 ```
+
+Or with [uv](https://docs.astral.sh/uv/) (faster, replaces venv + pip):
+
+```bash
+uv venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+uv pip install fastapi uvicorn[standard] pymongo pydantic-settings python-dotenv
+```
+
+> **Note:** Earlier FARM tutorials used [Motor](https://pypi.org/project/motor/) as the async MongoDB driver. Motor is officially deprecated as of 2026-05-14 (critical fixes only until 2027-05-14); MongoDB recommends the PyMongo Async API (`AsyncMongoClient` in the `pymongo` package), which this guide uses.
 
 ### Create server/config.py
 
 ```python
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -69,8 +81,7 @@ class Settings(BaseSettings):
     database_name: str = "farm_app"
     cors_origin: str = "http://localhost:5173"
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env")
 
 
 settings = Settings()
@@ -79,10 +90,10 @@ settings = Settings()
 ### Create server/database.py
 
 ```python
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from config import settings
 
-client = AsyncIOMotorClient(settings.mongodb_uri)
+client = AsyncMongoClient(settings.mongodb_uri)
 db = client[settings.database_name]
 
 # Collections
@@ -121,7 +132,7 @@ class ItemResponse(BaseModel):
 
 ```python
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from bson import ObjectId
@@ -148,7 +159,7 @@ def item_to_response(item: dict) -> dict:
         "name": item["name"],
         "description": item.get("description", ""),
         "category": item.get("category", "general"),
-        "created_at": item.get("created_at", datetime.utcnow()),
+        "created_at": item.get("created_at", datetime.now(timezone.utc)),
     }
 
 
@@ -184,7 +195,7 @@ async def create_item(data: ItemCreate):
         "name": data.name,
         "description": data.description,
         "category": data.category,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
     }
     result = await items_collection.insert_one(doc)
     doc["_id"] = result.inserted_id
@@ -221,11 +232,11 @@ async def delete_item(item_id: str):
 ### Create server/requirements.txt
 
 ```
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
-motor==3.6.0
-pydantic-settings==2.6.0
-python-dotenv==1.0.1
+fastapi==0.139.0
+uvicorn[standard]==0.50.1
+pymongo==4.17.0
+pydantic-settings==2.14.2
+python-dotenv==1.2.2
 ```
 
 ### Create server/.env (for local development)
@@ -276,7 +287,7 @@ git push -u origin main
 3. Connect the `farm-server` repository
 4. Configure:
    - **Name:** `farm-server`
-   - **Runtime:** Python
+   - **Language:** Python 3
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
    - **Instance Type:** Free
@@ -307,6 +318,8 @@ cd client
 npm install
 npm install axios
 ```
+
+Or with [pnpm](https://pnpm.io/): `pnpm create vite client --template react`, then `pnpm install` and `pnpm add axios`.
 
 ### Create client/src/api.js
 
@@ -423,7 +436,7 @@ function App() {
                 <strong>{item.name}</strong>
                 {item.description && (
                   <span style={{ color: '#666', marginLeft: '0.5rem' }}>
-                    — {item.description}
+                    -- {item.description}
                   </span>
                 )}
               </div>
@@ -467,6 +480,8 @@ cd client && npm run dev
 
 Open http://localhost:5173 to verify the frontend talks to the backend.
 
+> **Tip:** For local development you can skip CORS entirely by adding a dev proxy to `vite.config.js` and calling relative `/api` paths: `server: { proxy: { '/api': { target: 'http://localhost:8000', changeOrigin: true } } }`. Production builds still use `VITE_API_URL`, which Vite bakes in at build time.
+
 ---
 
 ## Step 5: Deploy the Frontend to GitHub Pages
@@ -507,11 +522,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
@@ -519,7 +534,7 @@ jobs:
         env:
           VITE_API_URL: https://farm-server.onrender.com
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -531,7 +546,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 ```
 
 ### Enable GitHub Pages
@@ -574,15 +589,18 @@ Now that the frontend is deployed, update `CORS_ORIGIN` on Render:
 Create `docker-compose.yml` in the project root (`farm-app/`):
 
 ```yaml
-version: "3.9"
-
 services:
   mongodb:
-    image: mongo:7
+    image: mongo:8
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: mongosh --eval "db.adminCommand('ping')" --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   server:
     build: ./server
@@ -593,7 +611,8 @@ services:
       - DATABASE_NAME=farm_app
       - CORS_ORIGIN=http://localhost:5173
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     volumes:
       - ./server:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -616,7 +635,7 @@ volumes:
 Create `server/Dockerfile`:
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.13-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -627,7 +646,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 Create `client/Dockerfile`:
 
 ```dockerfile
-FROM node:20-slim
+FROM node:22-slim
 WORKDIR /app
 COPY package*.json .
 RUN npm ci

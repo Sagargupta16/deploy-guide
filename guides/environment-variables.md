@@ -73,6 +73,8 @@ const dbUrl = process.env.DATABASE_URL;
 const port = process.env.PORT || 3000;
 ```
 
+**Native alternative:** Node.js can load `.env` files without any package: `node --env-file=.env app.js` (stable on Node 22/24). Use `--env-file-if-exists=.env` to skip the error when the file is missing. The `dotenv` package is still useful when the loading must happen inside code (e.g. library-level loading) rather than on the command line.
+
 **Note:** Vite, Next.js, and Create React App have built-in `.env` support. You do NOT need the `dotenv` package with these frameworks.
 
 ### Python (python-dotenv)
@@ -95,15 +97,14 @@ debug = os.getenv("DEBUG", "False").lower() == "true"
 **FastAPI example:**
 
 ```python
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
     database_url: str
     secret_key: str
     debug: bool = False
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()
 ```
@@ -143,14 +144,14 @@ PORT=3000
 CORS_ORIGIN=http://localhost:5173
 ```
 
-Commit `.env.example` to git so teammates know which variables are needed.
+Commit `.env.example` to git so teammates know which variables are needed. Treat it as the canonical variable list: if a secret exists in multiple places (local `.env`, platform dashboard, CI secrets), `.env.example` is the checked-in contract, and a rotated secret must be updated in every place or environments diverge silently.
 
 ### If You Accidentally Committed Secrets
 
 1. **Rotate the secret immediately.** Generate a new API key / password. The old one is compromised.
 2. Remove the file from tracking: `git rm --cached .env`
 3. Add to `.gitignore` and commit.
-4. Consider using `git filter-branch` or [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) to scrub history, but remember: **rotating the secret is the priority.**
+4. Consider using [git-filter-repo](https://github.com/newren/git-filter-repo) (GitHub's recommended tool, use version 2.47+ with `--sensitive-data-removal`) or [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) to scrub history, but remember: **rotating the secret is the priority.**
 
 ---
 
@@ -181,6 +182,8 @@ smtp host=...            # spaces not allowed
 | `REDIS_` | Redis configuration | `REDIS_URL`, `REDIS_PASSWORD` |
 | `APP_` | Application-specific | `APP_NAME`, `APP_ENV`, `APP_DEBUG` |
 
+**Tip:** Prefix your own backend variables with an app-specific prefix (e.g., `MYAPP_DATABASE_URL` via pydantic-settings' `env_prefix`). Platforms inject their own variables (`VERCEL_*`, `NEON_*`, `RENDER_*`), and a unique prefix guarantees no collisions.
+
 ---
 
 ## Build-Time vs Runtime Variables
@@ -198,9 +201,13 @@ This distinction is critical and is the source of many deployment bugs.
 
 **Docker containers** read runtime variables from the container environment, but `ARG` values in a Dockerfile are build-time only.
 
+**Gotcha:** If the build itself reads external services (e.g., Next.js SSG pages querying a database in `generateStaticParams`), the same variables production needs at runtime must ALSO exist at build time -- in the platform's env settings and in any CI job that runs the build.
+
 ---
 
 ## Framework-Specific Prefixes
+
+**Warning:** Prefixed variables (`VITE_`, `NEXT_PUBLIC_`, `REACT_APP_`) are baked into the public JavaScript bundle at build time. Anyone can read them in the browser. Never put secrets in them -- only URLs, feature flags, and other public config.
 
 ### Vite (React, Vue, Svelte)
 
@@ -224,6 +231,8 @@ const mode = import.meta.env.MODE; // 'development' or 'production'
 
 Vite loads `.env`, `.env.local`, `.env.development`, `.env.production` automatically based on the mode.
 
+**Tip:** In development, skip `VITE_API_URL` entirely by proxying API calls in `vite.config.ts` (`server: { proxy: { '/api': { target: 'http://localhost:8000', changeOrigin: true } } }`). The app calls relative `/api` paths locally with no CORS setup; only production builds need the baked-in API URL.
+
 ### Next.js
 
 Variables starting with `NEXT_PUBLIC_` are exposed to the browser. All others are server-only.
@@ -231,7 +240,7 @@ Variables starting with `NEXT_PUBLIC_` are exposed to the browser. All others ar
 ```env
 # Exposed to browser AND server
 NEXT_PUBLIC_API_URL=https://api.example.com
-NEXT_PUBLIC_ANALYTICS_ID=UA-XXXXXX
+NEXT_PUBLIC_ANALYTICS_ID=G-XXXXXXXXXX
 
 # Server-only (API routes, getServerSideProps, Server Components)
 DATABASE_URL=postgresql://...
@@ -263,7 +272,7 @@ Access in code:
 const apiUrl = process.env.REACT_APP_API_URL;
 ```
 
-**Note:** CRA is in maintenance mode. New projects should use Vite instead.
+**Note:** Create React App was officially deprecated by the React team on 2025-02-14 and has no active maintainers. This section applies to legacy CRA projects only. New projects should use Vite (or a framework like Next.js) instead.
 
 ---
 
@@ -297,7 +306,11 @@ jobs:
           echo "Deploying with version $APP_VERSION"
 ```
 
+Public build-time values (e.g., a frontend's `VITE_API_BASE_URL`) belong in Variables, not Secrets -- they are baked into the public bundle anyway, and Variables stay visible for debugging.
+
 **Environment-specific secrets:** Create environments (e.g., `staging`, `production`) under Settings > Environments to scope secrets per deployment target.
+
+**AWS deploys:** Prefer OIDC over storing long-lived `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets. Declare `permissions: id-token: write` and use `aws-actions/configure-aws-credentials@v4` with `role-to-assume` pointing at an IAM role that trusts GitHub's OIDC provider. Scope the role's trust policy `sub` claim per environment (e.g., `repo:OWNER/REPO:ref:refs/heads/main` for production, `repo:OWNER/REPO:pull_request` for previews) so PR workflows cannot assume the production role.
 
 ---
 
@@ -337,7 +350,7 @@ Variables are available at build time and runtime (for serverless functions). `N
 services:
   - type: web
     name: my-api
-    env: node
+    runtime: node
     envVars:
       - key: NODE_ENV
         value: production
@@ -361,13 +374,16 @@ The `sync: false` flag is important for secrets. It tells Render the value must 
 
 ```bash
 # Set a variable
-railway variables set DATABASE_URL="postgresql://..."
+railway variable set DATABASE_URL="postgresql://..."
 
 # Set multiple
-railway variables set NODE_ENV=production PORT=3000
+railway variable set NODE_ENV=production PORT=3000
 
 # List variables
-railway variables list
+railway variable list
+
+# Delete a variable
+railway variable delete OLD_API_KEY
 ```
 
 Railway supports **shared variables** across services in a project and **reference variables** that pull from other services (e.g., a database's connection string).
@@ -376,13 +392,13 @@ Railway supports **shared variables** across services in a project and **referen
 
 ### Netlify
 
-**Dashboard:** Site > Site configuration > Environment variables
+**Dashboard:** Project > Project configuration > Environment variables
 
 **netlify.toml:**
 
 ```toml
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
   NPM_FLAGS = "--prefix=/dev/null"
 
 # Environment-specific
@@ -504,6 +520,8 @@ python -c "import secrets; print(secrets.token_hex(64))"
 openssl rand -hex 64
 ```
 
+**Fail fast on weak secrets:** Have the app refuse to start in production if `JWT_SECRET` (or equivalent) is unset or shorter than 32 characters. A crash at boot is far better than silently signing tokens with an empty string.
+
 ---
 
 ## Secret Rotation Practices
@@ -550,6 +568,20 @@ For database passwords, use a rolling approach:
 4. **Check the environment scope.** On Vercel, variables can be scoped to Production only. Preview deploys will not see them.
 5. **Check .env file location.** The `.env` file must be in the project root (next to `package.json`), not in `src/`.
 
+### Variable Works in the App but Not in CLI Tools
+
+**Symptoms:** The framework sees `DATABASE_URL` but a CLI tool run from the same directory (ORM migrations, seed scripts) reports it missing.
+
+**Explanation:** Framework env loading is a framework feature. Next.js auto-loads `.env.local`, but tools like `drizzle-kit` do not, so `db:push` / `db:migrate` fail unless the config file loads it explicitly:
+
+```typescript
+// drizzle.config.ts
+import { config } from "dotenv";
+config({ path: ".env.local" });
+```
+
+For standalone scripts, pass the file on the command line: `tsx --env-file=.env.local seed.ts` or `node --env-file=.env app.js`.
+
 ### Build-Time vs Runtime Confusion
 
 **Symptoms:** Variable works locally but is `undefined` in production. Variable shows old value after changing on the platform.
@@ -584,6 +616,14 @@ For database passwords, use a rolling approach:
    echo -n 'complex!@#value' | base64
    # Store the base64 string, decode in your app
    ```
+
+### Connection String Query Parameters
+
+**Symptoms:** Database connects locally but fails on the deployment platform, often with an SSL or channel binding error.
+
+**Fixes:**
+1. **Neon pooled connections:** Neon's console appends `channel_binding=require` by default, but PgBouncer (the pooler) does not support channel binding. Use the pooler connection string with `?sslmode=require` and remove `channel_binding=require`.
+2. **Driver scheme mismatches:** SQLAlchemy with psycopg v3 needs `postgresql+psycopg://`, not the bare `postgresql://` most consoles hand out. Normalize the scheme in code or in the stored `DATABASE_URL`.
 
 ### Variables Not Available in CI/CD Forks
 
