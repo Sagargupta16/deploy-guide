@@ -8,7 +8,7 @@ Netlify is a platform for building and deploying modern web projects. It excels 
 
 - [ ] A [Netlify account](https://app.netlify.com/signup) (sign up with GitHub recommended)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] [Node.js 18+](https://nodejs.org/)
+- [ ] [Node.js 22+](https://nodejs.org/)
 - [ ] (Optional) [Netlify CLI](https://docs.netlify.com/cli/get-started/): `npm i -g netlify-cli`
 
 ---
@@ -58,14 +58,14 @@ git push -u origin main
 ### Step 3: Import in Netlify
 
 1. Go to [app.netlify.com](https://app.netlify.com/)
-2. Click **Add new site** > **Import an existing project**
+2. Click **Add new project** > **Import an existing project**
 3. Select **GitHub** and authorize Netlify
 4. Choose your `my-static-site` repository
 5. Configure build settings:
    - **Branch to deploy:** `main`
    - **Build command:** (leave empty for plain HTML)
    - **Publish directory:** `.` (or your output folder)
-6. Click **Deploy site**
+6. Click **Publish**
 
 Your site is live in seconds at a URL like `https://random-name-123.netlify.app`.
 
@@ -157,7 +157,7 @@ Create `netlify.toml` in your project root for full build and deploy configurati
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 
 # Production context
 [context.production]
@@ -269,17 +269,25 @@ export default async (req, context) => {
 Create `netlify/functions/daily-cleanup.js`:
 
 ```js
-import { schedule } from '@netlify/functions';
-
-const handler = async (event) => {
+export default async (req) => {
   console.log('Running daily cleanup...');
   // Your cleanup logic here
-  return { statusCode: 200 };
 };
 
 // Run every day at midnight UTC
-export default schedule('0 0 * * *', handler);
+export const config = {
+  schedule: '0 0 * * *',
+};
 ```
+
+Or declare the schedule in `netlify.toml`:
+
+```toml
+[functions."daily-cleanup"]
+  schedule = "@daily"
+```
+
+> **Note:** Scheduled functions have a 30-second execution limit. For longer jobs, use a background function instead.
 
 ---
 
@@ -348,14 +356,14 @@ export const config = {
 | `API_SECRET_KEY` | Secret API key (server only) | `sk_live_abc123` |
 | `VITE_API_URL` | Public API URL (Vite apps) | `https://api.example.com` |
 | `NEXT_PUBLIC_API_URL` | Public API URL (Next.js) | `https://api.example.com` |
-| `NODE_VERSION` | Node.js version for builds | `20` |
+| `NODE_VERSION` | Node.js version for builds | `22` |
 | `NPM_FLAGS` | Custom npm flags | `--legacy-peer-deps` |
 | `SITE_URL` | Site URL (auto-set by Netlify) | `https://your-site.netlify.app` |
 
 ### Set via Dashboard
 
-1. Go to your site on [app.netlify.com](https://app.netlify.com/)
-2. Navigate to **Site configuration** > **Environment variables**
+1. Go to your project on [app.netlify.com](https://app.netlify.com/)
+2. Navigate to **Project configuration** > **Environment variables** (team-shared variables live under **Team settings** > **Environment variables**)
 3. Click **Add a variable**
 4. Enter the key and value
 5. Choose scopes: **All**, **Builds**, **Functions**, **Post processing**
@@ -393,7 +401,9 @@ netlify env:import .env
 
 ## Netlify Forms
 
-Netlify Forms handles form submissions without any server-side code. Add a `netlify` attribute to any HTML form and Netlify captures submissions automatically.
+Netlify Forms handles form submissions without any server-side code. On credit-based plans, submissions are free and unlimited.
+
+> **Required first step:** Form detection is off by default. In the Netlify UI, go to **Forms** and select **Enable form detection** -- only deploys after enabling are scanned for `data-netlify` forms. Then add a `netlify` attribute to any HTML form and Netlify captures submissions automatically.
 
 ### Basic Form
 
@@ -481,7 +491,7 @@ function ContactForm() {
 1. Go to your site on Netlify
 2. Navigate to **Forms** in the sidebar
 3. View, export, or delete submissions
-4. Set up email notifications under **Site configuration** > **Forms** > **Form notifications**
+4. Set up email notifications under **Project configuration** > **Forms** > **Form notifications**
 
 ---
 
@@ -550,21 +560,22 @@ Netlify shows the required DNS records. You have two options:
 **Option A: Use Netlify DNS (recommended)**
 
 1. In **Domain management**, click **Set up Netlify DNS**
-2. Netlify provides nameservers (e.g., `dns1.p01.nsone.net`)
-3. Update your domain registrar to use Netlify's nameservers:
-
-| Nameserver |
-|------------|
-| `dns1.p01.nsone.net` |
-| `dns2.p01.nsone.net` |
-| `dns3.p01.nsone.net` |
-| `dns4.p01.nsone.net` |
+2. Netlify assigns four nameservers to your domain -- make note of the ones listed in the **Name servers** panel (assignments vary per domain, so do not copy values from another site)
+3. Update your domain registrar to use those four nameservers
 
 **Option B: External DNS**
 
 Add these records at your DNS provider:
 
 **For apex domain (`yourdomain.com`):**
+
+Preferred: an ALIAS, ANAME, or flattened CNAME record (if your DNS provider supports one):
+
+| Type | Name | Value |
+|------|------|-------|
+| ALIAS / ANAME | @ | `apex-loadbalancer.netlify.com` |
+
+Fallback (less resilient, worse CDN routing) if your provider only supports A records:
 
 | Type | Name | Value |
 |------|------|-------|
@@ -589,30 +600,34 @@ To force HTTPS:
 
 ## Free Tier
 
-Netlify's free tier is generous for personal and small projects:
+Netlify moved to credit-based pricing on 2025-09-04 for new accounts. Instead of separate bandwidth and build-minute quotas, each plan grants a monthly pool of credits that all usage draws from:
 
-| Feature | Free (Starter) | Pro ($19/mo per member) |
-|---------|-----------------|-------------------------|
-| **Bandwidth** | 100 GB/month | 1 TB/month |
-| **Build minutes** | 300 min/month | 25,000 min/month |
-| **Serverless functions** | 125,000 requests/month | 2M requests/month |
-| **Function runtime** | 10 seconds max | 26 seconds max |
-| **Edge functions** | 3M invocations/month | 3M invocations/month |
-| **Forms** | 100 submissions/month | 1,000 submissions/month |
-| **Identity** | 1,000 active users | 1,000 active users |
-| **Analytics** | Not included | Included |
-| **Deploy previews** | Unlimited | Unlimited |
-| **Concurrent builds** | 1 | 3 |
-| **Team members** | 1 | Unlimited |
+| Feature | Free | Personal ($9/mo) | Pro ($20/mo, flat) |
+|---------|------|------------------|--------------------|
+| **Credits** | 300/month | 1,000/month | 3,000/month |
+| **Team members** | 1 | 1 | Unlimited |
+| **Forms** | Free, unlimited | Free, unlimited | Free, unlimited |
+| **Identity active users** | Unlimited | Unlimited | Unlimited |
+| **Deploy previews** | Unlimited | Unlimited | Unlimited |
+| **Extra credits** | Not purchasable | Purchasable | Purchasable |
+
+Credit consumption rates:
+
+| Usage | Credits |
+|-------|---------|
+| Production deploy | 15 each |
+| Bandwidth | 20 per GB |
+| Compute (functions + build time) | 10 per GB-hour |
+| Web requests | 2 per 10,000 |
 
 ### Key things to know:
 
-- **The free tier is always-on.** Static sites do not spin down or sleep.
+- **Sites do not sleep for inactivity**, but if your team exhausts its monthly credits, all projects on the team are paused (no web requests, form submissions, or production deploys) and visitors see a "Site not available" page. On the Free plan you cannot buy extra credits -- you wait for the next billing cycle or upgrade.
 - **Deploy previews are unlimited.** Every pull request gets a unique preview URL at no cost.
-- **Build minutes are shared** across all sites in your account. 300 minutes goes quickly with frequent deploys.
-- **Serverless functions have a 10-second timeout** on the free tier. Optimize long-running operations.
-- **Forms are limited to 100 submissions/month.** Use a third-party service (e.g., Formspree) if you need more.
-- **Bandwidth overages** are billed at $55 per 100 GB on the free plan. Monitor usage under **Site configuration** > **Usage**.
+- **Build minutes are no longer a separate metric.** Build time counts as compute GB-hours against your credits. An extra concurrent build is a $40/mo add-on.
+- **Serverless functions have a 60-second synchronous timeout** on all plans (not configurable). Scheduled functions get 30 seconds; background functions get 15 minutes.
+- **Forms are free and unlimited** on credit-based plans.
+- **Legacy plans** (accounts created before 2025-09-04) keep the old metered limits: 100 GB bandwidth, 300 build minutes, 125K function requests, $19/mo-per-member Pro, and $55/100 GB overage. Monitor usage under **Project configuration** > **Usage**.
 
 ---
 
@@ -628,13 +643,13 @@ Netlify's free tier is generous for personal and small projects:
 
 ```toml
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 ```
 
-Or create a `.node-version` file:
+Or create a `.node-version` (or `.nvmrc`) file, which Netlify auto-detects:
 
 ```
-20
+22
 ```
 
 2. Clear the build cache and redeploy:
@@ -679,9 +694,9 @@ Or in `netlify.toml`:
 
 > **Important:** The SPA redirect must be the LAST redirect rule because Netlify processes redirects in order and stops at the first match.
 
-### Problem: Serverless function timeout (10-second limit)
+### Problem: Serverless function timeout (60-second limit)
 
-**Cause:** The function exceeds the 10-second execution limit on the free tier.
+**Cause:** The function exceeds the 60-second synchronous execution limit (applies on all plans and is not configurable).
 
 **Fix:**
 
@@ -706,15 +721,18 @@ export default async (req, context) => {
 };
 ```
 
-2. For long-running operations, use Netlify Background Functions (Pro plan):
+2. For long-running operations, use Netlify Background Functions (available on all plans, up to 15 minutes):
 
 ```js
-// netlify/functions/long-task-background.js
-// The "-background" suffix makes it a background function (up to 15 minutes)
+// netlify/functions/long-task.js
 export default async (req, context) => {
   // Long-running task here
   await processLargeDataset();
-  return { statusCode: 200 };
+};
+
+// Marks this as a background function (up to 15 minutes)
+export const config = {
+  background: true,
 };
 ```
 
@@ -722,17 +740,19 @@ export default async (req, context) => {
 
 ### Problem: Netlify Forms submissions not appearing
 
-**Cause:** The form is not detected during the build, the `data-netlify="true"` attribute is missing, or the hidden `form-name` input is missing.
+**Cause:** Form detection is not enabled (it is off by default), the form is not detected during the build, the `data-netlify="true"` attribute is missing, or the hidden `form-name` input is missing.
 
 **Fix:**
 
-1. Ensure the form has `data-netlify="true"`:
+1. Enable form detection: in the Netlify UI, go to **Forms** and select **Enable form detection**, then redeploy. Only deploys after enabling are scanned for forms. This is the most common cause.
+
+2. Ensure the form has `data-netlify="true"`:
 
 ```html
 <form name="contact" method="POST" data-netlify="true">
 ```
 
-2. For SPAs (React, Vue), add a hidden HTML form in `public/index.html` so Netlify can detect it at build time:
+3. For SPAs (React, Vue), add a hidden HTML form in `public/index.html` so Netlify can detect it at build time:
 
 ```html
 <form name="contact" data-netlify="true" hidden>
@@ -742,7 +762,7 @@ export default async (req, context) => {
 </form>
 ```
 
-3. Include the hidden `form-name` field in your JavaScript form submission:
+4. Include the hidden `form-name` field in your JavaScript form submission:
 
 ```js
 const formData = new URLSearchParams({
@@ -759,7 +779,7 @@ await fetch('/', {
 });
 ```
 
-4. Check form submissions in the Netlify dashboard under **Forms**
+5. Check form submissions in the Netlify dashboard under **Forms**
 
 ### Problem: Deploy previews show wrong content or fail
 
@@ -768,7 +788,7 @@ await fetch('/', {
 **Fix:**
 
 1. Ensure environment variables are available in the deploy-preview context:
-   - Go to **Site configuration** > **Environment variables**
+   - Go to **Project configuration** > **Environment variables**
    - Set the variable scope to include **Deploy previews**
 
 2. Use `netlify.toml` to set context-specific build commands:
@@ -808,22 +828,20 @@ await fetch('/', {
 /*            /index.html                  200
 ```
 
-3. Use the Netlify [redirect playground](https://play.netlify.com/redirects) to test your rules
-
-4. Check redirect behavior with the CLI:
+3. Check redirect behavior with the CLI:
 
 ```bash
 netlify dev
 # Visit http://localhost:8888 and test your redirects locally
 ```
 
-### Problem: Large site exceeds bandwidth on the free tier
+### Problem: Site paused after burning through free-tier credits
 
-**Cause:** The 100 GB monthly bandwidth limit is reached, often due to large assets or high traffic.
+**Cause:** The 300 monthly credits are exhausted, often due to bandwidth (20 credits/GB, so roughly 15 GB/month effective) from large assets or high traffic. When credits run out, all projects on the team are paused and visitors see a "Site not available" page. On the Free plan you cannot buy extra credits -- you wait for the next billing cycle or upgrade.
 
 **Fix:**
 
-1. Check bandwidth usage under **Site configuration** > **Usage**
+1. Check credit usage under **Project configuration** > **Usage**
 
 2. Optimize assets:
 
@@ -850,4 +868,4 @@ npx sharp-cli --input "src/images/*.{jpg,png}" --output "src/images/optimized" -
 
 4. Use a CDN like Cloudflare in front of Netlify to reduce bandwidth from Netlify's perspective
 
-5. Upgrade to the Pro plan ($19/month) for 1 TB bandwidth if needed
+5. Upgrade to the Personal plan ($9/month, 1,000 credits) or Pro plan ($20/month, 3,000 credits) if needed

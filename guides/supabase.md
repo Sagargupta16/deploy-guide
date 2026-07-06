@@ -7,9 +7,9 @@ Supabase wraps a full PostgreSQL database with a suite of tools: automatic REST 
 ## Prerequisites
 
 - [ ] A [Supabase account](https://supabase.com/dashboard) (sign up with GitHub for easiest setup)
-- [ ] [Node.js 18+](https://nodejs.org/) (for JavaScript usage)
-- [ ] [Python 3.9+](https://www.python.org/downloads/) (for Python usage)
-- [ ] (Optional) [Supabase CLI](https://supabase.com/docs/guides/cli): `npm install -g supabase`
+- [ ] [Node.js 22+](https://nodejs.org/) (for JavaScript usage)
+- [ ] [Python 3.12+](https://www.python.org/downloads/) (for Python usage)
+- [ ] (Optional) [Supabase CLI](https://supabase.com/docs/guides/cli): `npm install supabase --save-dev` (then run with `npx supabase`)
 
 ---
 
@@ -31,17 +31,21 @@ The project takes about 2 minutes to provision. Once ready, you have a full Post
 ## Step 2: Get Your API Keys
 
 1. Go to your project dashboard
-2. Click **Settings** > **API** in the sidebar
+2. Click **Settings** > **API Keys** in the sidebar
 3. Copy these values:
 
 | Value | Where to Find | What It Is |
 |-------|---------------|------------|
-| **Project URL** | Settings > API | `https://<project-id>.supabase.co` |
-| **Anon (public) key** | Settings > API > Project API keys | Safe to use in browser code. Respects RLS policies. |
-| **Service role key** | Settings > API > Project API keys | **Server-only.** Bypasses RLS. Never expose to the client. |
-| **Connection string** | Settings > Database > Connection string | Direct Postgres connection: `postgresql://postgres:[password]@db.<project-id>.supabase.co:5432/postgres` |
+| **Project URL** | Settings > API Keys (or the Connect dialog) | `https://<project-id>.supabase.co` |
+| **Publishable key** (`sb_publishable_...`) | Settings > API Keys | Safe to use in browser code. Respects RLS policies. |
+| **Secret key** (`sb_secret_...`) | Settings > API Keys | **Server-only.** Bypasses RLS. Never expose to the client. Supabase blocks secret keys used from browsers. |
+| **Connection string** | **Connect** button at the top of the dashboard | Direct Postgres connection: `postgresql://postgres:[password]@db.<project-id>.supabase.co:5432/postgres` |
 
-> **Warning:** The service role key bypasses all Row Level Security. Only use it in server-side code, never in a browser or mobile app.
+> **Warning:** The secret key bypasses all Row Level Security. Only use it in server-side code, never in a browser or mobile app.
+
+> **Note:** Publishable and secret keys replace the legacy JWT-based `anon` and `service_role` keys. Projects created after November 2025 do not have the legacy keys at all; older projects keep them working alongside the new keys until Supabase removes them in late 2026. Migrate to the new keys.
+
+> **Note:** Direct connections (`db.<project-id>.supabase.co:5432`) are IPv6-only by default. On IPv4-only networks (many CI runners and hosts), use the Supavisor pooler connection string or the paid IPv4 add-on.
 
 ---
 
@@ -92,12 +96,12 @@ Both methods produce the same result. The SQL Editor is faster for complex schem
 
 ## Row Level Security (RLS)
 
-RLS is enabled by default on new tables in Supabase. Without policies, **no rows are accessible** via the API. You must create policies to allow access.
+RLS is enabled by default only on tables created with the **Table Editor**. Tables created in raw SQL or the **SQL Editor** (like the ones in Step 3) have RLS **disabled** until you enable it yourself -- until then, every row is exposed through the API. Once RLS is on, no rows are accessible without policies.
 
 ### Enable RLS and Add Policies
 
 ```sql
--- Enable RLS (already enabled by default on new tables)
+-- Enable RLS (required for tables created via SQL; Table Editor tables have it on already)
 ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 
 -- Allow anyone to read published posts
@@ -149,7 +153,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_PUBLISHABLE_KEY
 );
 ```
 
@@ -188,14 +192,14 @@ const { error: deleteError } = await supabase
 
 ### Server-Side Client (Bypasses RLS)
 
-For server-side operations that need full access, use the service role key:
+For server-side operations that need full access, use the secret key:
 
 ```js
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SECRET_KEY
 );
 
 // This bypasses RLS -- use only in trusted server environments
@@ -221,7 +225,7 @@ import os
 from supabase import create_client, Client
 
 url = os.environ["SUPABASE_URL"]
-key = os.environ["SUPABASE_ANON_KEY"]
+key = os.environ["SUPABASE_PUBLISHABLE_KEY"]
 
 supabase: Client = create_client(url, key)
 ```
@@ -264,7 +268,7 @@ from fastapi import FastAPI, HTTPException
 from supabase import create_client
 
 url = os.environ["SUPABASE_URL"]
-key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+key = os.environ["SUPABASE_SECRET_KEY"]
 supabase = create_client(url, key)
 
 app = FastAPI()
@@ -456,14 +460,16 @@ Supabase Realtime lets you listen for database changes over WebSockets.
 
 ### Enable Realtime on a Table
 
-1. Go to **Database** > **Replication**
-2. Enable replication for the tables you want to subscribe to
+1. Go to **Database** > **Publications**
+2. Toggle the tables you want to subscribe to under the `supabase_realtime` publication
 
 Or via SQL:
 
 ```sql
 ALTER PUBLICATION supabase_realtime ADD TABLE posts;
 ```
+
+> **Tip:** For high-traffic apps, Supabase recommends the Broadcast feature over `postgres_changes`, which does not scale as well.
 
 ### Subscribe to Changes (Node.js)
 
@@ -526,8 +532,8 @@ const channel = supabase
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `SUPABASE_URL` | Project API URL | `https://abcdefghij.supabase.co` |
-| `SUPABASE_ANON_KEY` | Public (anon) API key. Safe for client-side. Respects RLS. | `eyJhbGciOiJIUzI1NiIs...` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret service role key. **Server-only.** Bypasses RLS. | `eyJhbGciOiJIUzI1NiIs...` |
+| `SUPABASE_PUBLISHABLE_KEY` | Publishable API key. Safe for client-side. Respects RLS. | `sb_publishable_...` |
+| `SUPABASE_SECRET_KEY` | Secret API key. **Server-only.** Bypasses RLS. | `sb_secret_...` |
 
 ### Set on Your Deployment Platform
 
@@ -539,11 +545,11 @@ const channel = supabase
 ```bash
 # .env
 SUPABASE_URL=https://abcdefghij.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SECRET_KEY=sb_secret_...
 ```
 
-> **Important:** Only use `SUPABASE_ANON_KEY` in client-side code. The `SUPABASE_SERVICE_ROLE_KEY` must only be used in server-side environments.
+> **Important:** Only use `SUPABASE_PUBLISHABLE_KEY` in client-side code. The `SUPABASE_SECRET_KEY` must only be used in server-side environments.
 
 ---
 
@@ -572,7 +578,7 @@ Key details:
 
 ### Problem: Query returns empty array but data exists
 
-**Cause:** Row Level Security is blocking the query. RLS is enabled by default, and without policies, no rows are returned.
+**Cause:** Row Level Security is blocking the query. Once RLS is enabled on a table, no rows are returned without a matching policy.
 
 **Fix:**
 
@@ -598,9 +604,9 @@ ALTER TABLE your_table DISABLE ROW LEVEL SECURITY;
 **Fix:**
 
 1. Verify `SUPABASE_URL` matches the project in your dashboard
-2. Verify `SUPABASE_ANON_KEY` is the **anon** key (not the service role key) for client-side use
-3. Regenerate keys if compromised: **Settings** > **API** > **Regenerate**
-4. Make sure you are not accidentally using the JWT secret instead of the API key
+2. Verify `SUPABASE_PUBLISHABLE_KEY` is the **publishable** key (`sb_publishable_...`, not the secret key) for client-side use
+3. Rotate keys if compromised: **Settings** > **API Keys** > create a new key and delete the old one
+4. If you have an older project still on legacy `anon`/`service_role` JWT keys, migrate to publishable/secret keys -- legacy keys are being removed in late 2026
 
 ### Problem: CORS errors in the browser
 
@@ -614,8 +620,8 @@ ALTER TABLE your_table DISABLE ROW LEVEL SECURITY;
 ```js
 fetch(`${SUPABASE_URL}/rest/v1/posts`, {
   headers: {
-    'apikey': SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'apikey': SUPABASE_PUBLISHABLE_KEY,
+    'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
     'Content-Type': 'application/json',
   },
 });
@@ -646,9 +652,9 @@ WITH CHECK (bucket_id = 'your-bucket');
 **Fix:**
 
 1. Use the **Supavisor pooler** connection string instead of the direct connection:
-   - Go to **Settings** > **Database** > **Connection string**
+   - Click the **Connect** button at the top of the dashboard
    - Select **Mode: Transaction** for serverless environments
-   - The pooler URL uses port `6543` instead of `5432`
+   - The pooler URL uses port `6543` instead of `5432` (session mode stays on `5432`)
 
 2. Connection string format:
 ```
@@ -672,11 +678,11 @@ const pool = new Pool({
 
 ### Problem: Realtime subscription not receiving events
 
-**Cause:** Replication is not enabled for the table, or RLS is blocking the subscription.
+**Cause:** The table is not in the realtime publication, or RLS is blocking the subscription.
 
 **Fix:**
 
-1. Enable replication: **Database** > **Replication** > toggle on your table
+1. Enable realtime: **Database** > **Publications** > toggle on your table under `supabase_realtime`
 2. Or via SQL: `ALTER PUBLICATION supabase_realtime ADD TABLE your_table;`
 3. Make sure your RLS policies allow SELECT for the subscribing user
 4. Check that you are calling `.subscribe()` on the channel

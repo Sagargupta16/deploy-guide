@@ -13,7 +13,7 @@ body:
     attributes:
       label: Platform Name
       description: The name of the deployment platform
-      placeholder: e.g., Railway, Fly.io, AWS Lambda
+      placeholder: e.g., AWS Lambda, Deno Deploy, Zeabur
     validations:
       required: true
 

@@ -2,13 +2,13 @@
 
 > Set up a free serverless PostgreSQL database with Neon, get a connection string, and use it in Python and Node.js.
 
-Neon is a serverless PostgreSQL provider that separates storage and compute, giving you features like branching, autoscaling, and a generous free tier. The free plan includes 0.5 GB of storage and 191 compute hours per month.
+Neon (acquired by Databricks in 2025, still runs as its own product) is a serverless PostgreSQL provider that separates storage and compute, giving you features like branching, autoscaling, and a generous free tier. The free plan includes 0.5 GB of storage and 100 CU-hours of compute per project per month, across up to 100 projects.
 
 ## Prerequisites
 
-- [ ] A [Neon account](https://neon.tech/) (sign up with GitHub for easiest setup)
-- [ ] [Python 3.9+](https://www.python.org/downloads/) (for Python usage)
-- [ ] [Node.js 18+](https://nodejs.org/) (for Node.js usage)
+- [ ] A [Neon account](https://neon.com/) (sign up with GitHub for easiest setup)
+- [ ] [Python 3.12+](https://www.python.org/downloads/) (for Python usage)
+- [ ] [Node.js 22+](https://nodejs.org/) (for Node.js usage)
 
 ---
 
@@ -18,11 +18,11 @@ Neon is a serverless PostgreSQL provider that separates storage and compute, giv
 2. Click **New Project**
 3. Configure:
    - **Project name:** `my-project`
-   - **Postgres version:** 16 (latest)
+   - **Postgres version:** 18 (default for new projects; 14-18 supported)
    - **Region:** Select the one closest to your deployment platform (e.g., `US East` for Render/Vercel)
 4. Click **Create Project**
 
-The project is created instantly with a default database called `neondb` and a default branch called `main`.
+The project is created instantly with a default database called `neondb` and a root branch called `production` (projects created via the API or CLI get a root branch named `main` instead).
 
 ---
 
@@ -33,17 +33,17 @@ After creating the project, Neon immediately shows your connection details. Copy
 It looks like this:
 
 ```
-postgresql://username:password@ep-xxxxx-xxxxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+postgresql://username:password@ep-xxxxx-xxxxx-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 You can also find it anytime:
 
 1. Go to your project dashboard
-2. Click **Connection Details** in the sidebar
-3. Select your branch and database
-4. Copy the connection string
+2. Click the **Connect** button
+3. In the "Connect to your database" modal, select your branch, database, and role
+4. Copy the connection string (pooled by default -- note the `-pooler` in the host; toggle for a direct connection)
 
-> **Important:** Neon requires `sslmode=require`. Always include it in your connection string.
+> **Important:** Neon requires `sslmode=require`. Always include it in your connection string. The console also appends `channel_binding=require` -- fine for direct connections, but remove it when connecting through the `-pooler` host (PgBouncer does not support channel binding).
 
 ---
 
@@ -73,6 +73,8 @@ CREATE TABLE posts (
 );
 ```
 
+> **Tip:** In production, run schema migrations (Alembic, Prisma, drizzle-kit) from a CI job on push to `main` -- with the Neon URL in a repo secret -- instead of at app startup. This keeps serverless deploys migration-free and gives you a manual re-run button via `workflow_dispatch`.
+
 ---
 
 ## Use in Python (SQLAlchemy)
@@ -80,7 +82,7 @@ CREATE TABLE posts (
 ### Install Dependencies
 
 ```bash
-pip install sqlalchemy psycopg2-binary python-dotenv
+pip install sqlalchemy "psycopg[binary]" python-dotenv
 ```
 
 ### Connect with SQLAlchemy
@@ -91,7 +93,8 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+# SQLAlchemy defaults postgresql:// to psycopg2 -- point it at psycopg v3
+DATABASE_URL = os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+psycopg://", 1)
 
 engine = create_engine(DATABASE_URL, echo=True)
 SessionLocal = sessionmaker(bind=engine)
@@ -141,7 +144,7 @@ from fastapi import FastAPI, Depends
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+DATABASE_URL = os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+psycopg://", 1)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
@@ -268,7 +271,8 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
 model User {
@@ -279,13 +283,15 @@ model User {
 }
 ```
 
+> Prisma 7 deprecated the old `prisma-client-js` provider and requires the `output` field -- the client is generated into your project, not `node_modules`, and you import `PrismaClient` from that generated path.
+
 ```bash
 npx prisma db push    # Sync schema to database
 npx prisma generate   # Generate client
 ```
 
 ```js
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './generated/prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -311,17 +317,17 @@ await prisma.user.delete({ where: { email: 'sagar@example.com' } });
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | Neon connection string | `postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require` |
+| `DATABASE_URL` | Neon connection string | `postgresql://user:pass@ep-xxx-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require` |
 
 Set this on your deployment platform:
 
 - **Render:** Service > Environment tab > Add `DATABASE_URL`
 - **Vercel:** Project Settings > Environment Variables > Add `DATABASE_URL`
-- **Local:** Create a `.env` file (add `.env` to `.gitignore`)
+- **Local:** Create a `.env` file (add `.env` to `.gitignore`). Note: unlike Next.js, CLI tools like drizzle-kit and standalone scripts do not auto-load `.env.local` -- load it explicitly (`dotenv` in the config, or `tsx --env-file=.env.local`)
 
 ```bash
 # .env
-DATABASE_URL=postgresql://myuser:mypassword@ep-xxxxx-xxxxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=postgresql://myuser:mypassword@ep-xxxxx-xxxxx-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require
 ```
 
 ---
@@ -330,18 +336,19 @@ DATABASE_URL=postgresql://myuser:mypassword@ep-xxxxx-xxxxx.us-east-2.aws.neon.te
 
 | Feature | Free Tier |
 |---------|-----------|
-| **Storage** | 0.5 GB |
-| **Compute hours** | 191 hours/month |
-| **Branches** | 10 |
-| **Projects** | 1 |
+| **Storage** | 0.5 GB per project |
+| **Compute** | 100 CU-hours/month per project |
+| **Branches** | 10 per project |
+| **Projects** | 100 |
 | **Autoscaling** | Up to 2 CU |
-| **History retention** | 24 hours |
+| **History retention** | 6 hours (capped at 1 GB-month) |
 
 Key details:
-- Compute suspends after 5 minutes of inactivity (automatic cold start on next query)
-- Cold start takes ~500ms-2s
-- The 191 compute hours are enough for hobby projects with intermittent traffic
+- Compute suspends after 5 minutes of inactivity (fixed on the free plan; automatic cold start on next query)
+- Cold start takes a few hundred milliseconds
+- 100 CU-hours run a 0.25 CU compute for ~400 hours/month -- plenty for hobby projects with intermittent traffic
 - Branching is a killer feature -- create instant copies of your database for testing
+- Paid plans are pay-as-you-go with no monthly minimum: Launch bills $0.106/CU-hour compute + $0.35/GB-month storage; Scale bills $0.222/CU-hour
 
 ---
 
@@ -407,23 +414,33 @@ engine = create_engine(
 
 **Fix:**
 
-1. Use connection pooling. Neon provides a built-in pooler -- change the port in your connection string:
+1. Use connection pooling. Neon provides a built-in PgBouncer pooler (transaction mode, up to 10,000 concurrent connections) -- append `-pooler` to the endpoint ID in the hostname, port stays 5432:
    - Direct connection: `ep-xxxxx.us-east-2.aws.neon.tech:5432`
-   - Pooled connection: `ep-xxxxx.us-east-2.aws.neon.tech:5432` with `-pooler` suffix on the host
-2. In the Neon console, go to **Connection Details** and check **Pooled connection**
-3. Use the pooled connection string in serverless environments (Vercel, AWS Lambda)
+   - Pooled connection: `ep-xxxxx-pooler.us-east-2.aws.neon.tech:5432`
+2. In the Neon console, click **Connect** on the project dashboard -- the connection string is pooled by default, with a toggle for a direct connection
+3. Use the pooled connection string in serverless environments (Vercel, AWS Lambda), and drop `channel_binding=require` from it (PgBouncer does not support channel binding)
+4. For read-mostly serverless workloads (single queries, no transactions), skip TCP pooling entirely: the `@neondatabase/serverless` driver's `neon()` HTTP client is the fastest path for one-shot queries and is safe to export as a module-level singleton -- each warm instance reuses one client
 
 ### Problem: Slow first query after inactivity
 
-**Cause:** Compute endpoint was suspended. Cold start takes 500ms-2s.
+**Cause:** Compute endpoint was suspended. It reactivates automatically within a few hundred milliseconds of the next query. If the branch has been idle for more than 24 hours, Neon may also archive it, and unarchiving adds a 15-25 s cold start on the next real request.
 
 **Fix:** This is expected on the free tier. Options:
 1. Accept cold starts for hobby projects
 2. Upgrade to a paid plan and disable suspension
 3. Use Neon's connection pooler which handles wake-up more gracefully
+4. Keep the branch warm with a scheduled GitHub Actions ping against an unauthenticated health endpoint:
 
-### Problem: Cannot create more than 1 project on free tier
+```yaml
+# .github/workflows/keepalive.yml
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl --silent --max-time 30 https://<your-backend>/health || echo "ignoring"
+```
 
-**Cause:** Free tier is limited to 1 project.
-
-**Fix:** Use **branches** within a single project. Branches are free (up to 10) and give you isolated database copies -- perfect for dev/staging environments.
+This costs ~0 Actions minutes and under 1% of the free CU-hours, and the `|| echo` keeps the job green even when the endpoint returns a non-200.

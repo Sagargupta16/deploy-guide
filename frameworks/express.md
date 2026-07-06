@@ -6,7 +6,7 @@ This guide walks through deploying a production-ready Express.js application to 
 
 ## Prerequisites
 
-- [ ] [Node.js 18+](https://nodejs.org/) installed
+- [ ] [Node.js 22+](https://nodejs.org/) installed (24 LTS recommended; 18 and 20 are end-of-life)
 - [ ] [Git](https://git-scm.com/downloads) installed
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] A [Render account](https://render.com/) (sign up with GitHub)
@@ -19,6 +19,7 @@ This guide walks through deploying a production-ready Express.js application to 
 mkdir my-express-api && cd my-express-api
 npm init -y
 npm install express cors dotenv
+# or with pnpm (v11, needs Node 22.13+): pnpm init && pnpm add express cors dotenv
 ```
 
 Create `server.js`:
@@ -74,8 +75,8 @@ Update `package.json`:
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "dotenv": "^16.3.0",
-    "express": "^4.18.0"
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
   }
 }
 ```
@@ -116,7 +117,7 @@ git push -u origin main
 3. Connect your GitHub repository
 4. Configure:
    - **Name:** `my-express-api`
-   - **Runtime:** Node
+   - **Language:** Node
    - **Build Command:** `npm install`
    - **Start Command:** `npm start`
    - **Instance Type:** Free
@@ -141,7 +142,10 @@ import mongoose from 'mongoose';
 
 mongoose.connect(process.env.MONGODB_URI, { dbName: 'myapp' })
   .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1); // exit so the platform restarts the service instead of serving 500s
+  });
 
 const itemSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -180,7 +184,7 @@ const { Pool } = pg;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: { require: true },
 });
 
 app.get('/api/items', async (req, res) => {
@@ -217,8 +221,8 @@ Set `DATABASE_URL` in Render's Environment tab. See the [Neon guide](../guides/n
 
 1. Go to your service on Render
 2. Click the **Environment** tab
-3. Add each variable
-4. Click **Save Changes** (triggers redeploy)
+3. Click **+ Add Environment Variable** and add each variable
+4. Save with **Save, rebuild, and deploy** or **Save and deploy** (choose **Save only** to skip the redeploy)
 
 ### Use CORS_ORIGIN for Dynamic CORS
 
@@ -266,15 +270,17 @@ git add package.json package-lock.json
 git push
 ```
 
-To pin the Node.js version, add to `package.json`:
+To pin the Node.js version, set a `NODE_VERSION` env var on Render, add a `.node-version` or `.nvmrc` file, or add a bounded range to `package.json`:
 
 ```json
 {
   "engines": {
-    "node": ">=18.0.0"
+    "node": "22.x"
   }
 }
 ```
+
+Always include an upper bound -- an unbounded range like `>=22` resolves to the latest Node release (Render's default is currently 24.x), which can change under you.
 
 ### Problem: "No open ports detected"
 
@@ -303,6 +309,8 @@ app.use(cors({
 }));
 ```
 
+Tip: for local development with a Vite frontend, you can skip CORS entirely by proxying in `vite.config.ts` (`server: { proxy: { '/api': 'http://localhost:3000' } }`) and calling relative `/api/*` paths.
+
 ### Problem: Request body is undefined
 
 **Cause:** Missing `express.json()` middleware.
@@ -316,11 +324,11 @@ app.use(express.urlencoded({ extended: true }));  // For form data
 
 ### Problem: Free tier cold start is too slow
 
-**Cause:** Render's free tier spins down after 15 minutes of inactivity.
+**Cause:** Render's free tier spins down after 15 minutes without inbound traffic. Note the free tier also caps each workspace at 750 instance hours per month, so keeping one service pinged awake full-time uses nearly all of it.
 
 **Fix:**
 
-1. Add a `/health` endpoint and monitor it with an external pinger for demos
+1. Add a `/health` endpoint and ping it on a schedule for demos (an external pinger or a GitHub Actions cron workflow that curls it)
 2. Or upgrade to Starter ($7/month) for always-on
 3. Optimize startup time: defer database connections, reduce dependency count
 

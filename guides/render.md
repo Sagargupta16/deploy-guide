@@ -8,8 +8,8 @@ Render is a cloud platform that supports web services, static sites, cron jobs, 
 
 - [ ] A [Render account](https://render.com/) (sign up with GitHub recommended)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] [Node.js 18+](https://nodejs.org/) (for Node.js/Express projects)
-- [ ] [Python 3.9+](https://www.python.org/downloads/) (for FastAPI projects)
+- [ ] [Node.js 22+](https://nodejs.org/) (for Node.js/Express projects)
+- [ ] [Python 3.12+](https://www.python.org/downloads/) (for FastAPI projects)
 
 ---
 
@@ -43,12 +43,14 @@ app.listen(PORT, () => {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.0"
+    "express": "^5.2.0"
   }
 }
 ```
 
 > **Important:** Always use `process.env.PORT`. Render assigns the port dynamically.
+
+> **Tip:** Pin your Node version with a `.nvmrc` file (e.g. `22`) in the repo root. Render reads it to pick the build image; without it, new services default to Node 24.
 
 ### Step 2: Push to GitHub
 
@@ -68,7 +70,7 @@ git push -u origin main
 3. Connect your GitHub repository
 4. Configure:
    - **Name:** `my-express-app`
-   - **Runtime:** Node
+   - **Language:** Node
    - **Build Command:** `npm install`
    - **Start Command:** `npm start`
    - **Instance Type:** Free
@@ -101,9 +103,11 @@ def health_check():
 Create `requirements.txt`:
 
 ```
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
+fastapi==0.139.0
+uvicorn[standard]==0.50.1
 ```
+
+> **Tip:** Pin your Python version with a `.python-version` file (e.g. `3.14`) in the repo root. Render reads it to pick the build image; without it, new services default to Python 3.14. Render also supports [uv](https://docs.astral.sh/uv/) natively -- it detects a `uv.lock` in the repo root (pin the uv version with the `UV_VERSION` env var).
 
 ### Step 2: Push to GitHub
 
@@ -123,7 +127,7 @@ git push -u origin main
 3. Connect your GitHub repository
 4. Configure:
    - **Name:** `my-fastapi-app`
-   - **Runtime:** Python
+   - **Language:** Python
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
    - **Instance Type:** Free
@@ -146,10 +150,10 @@ Your API docs are automatically available at `https://my-fastapi-app.onrender.co
 ### Set via Dashboard
 
 1. Go to your service on Render
-2. Navigate to **Environment** tab
-3. Click **Add Environment Variable**
+2. Click **Environment** in the left pane
+3. Click **+ Add Environment Variable** (or **Add from .env** to paste in bulk)
 4. Enter key-value pairs
-5. Click **Save Changes** (triggers a redeploy)
+5. Save with **Save, rebuild, and deploy** or **Save and deploy** (choose **Save only** to skip the redeploy)
 
 ### Set via render.yaml (Infrastructure as Code)
 
@@ -194,7 +198,9 @@ Add the DNS record shown by Render:
 
 | Type | Name | Value |
 |------|------|-------|
-| A | @ | (IP shown by Render) |
+| A | @ | `216.24.57.1` |
+
+> Use an ANAME/ALIAS record instead if your DNS provider supports it, and remove any AAAA records -- Render serves over IPv4 only.
 
 ### Step 3: Verify and SSL
 
@@ -211,7 +217,7 @@ Auto-deploy is enabled by default when you connect a GitHub repo. Every push to 
 If you want manual control:
 
 1. Go to your service **Settings**
-2. Under **Build & Deploy**, toggle off **Auto-Deploy**
+2. Under **Build & Deploy**, set the **Auto-Deploy** dropdown to **Off** (the other options are **On Commit** and **After CI Checks Pass**)
 
 ### Deploy Hooks
 
@@ -231,17 +237,17 @@ Render's free tier has important constraints:
 | Feature | Free Tier | Paid (Starter $7/mo) |
 |---------|-----------|----------------------|
 | **Spin-down** | Sleeps after 15 min of inactivity | Always on |
-| **Cold start** | ~30-60 seconds on first request | None |
+| **Cold start** | ~1 minute on first request | None |
 | **Hours** | 750 hours/month total across all free services | Unlimited |
-| **Bandwidth** | 100 GB/month | 100 GB/month |
+| **Bandwidth** | 5 GB/month per workspace (then $0.15/GB) | 5 GB/month per workspace (then $0.15/GB) |
 | **Build minutes** | 500 min/month | 500 min/month |
 
 ### Key things to know:
 
-- **Free services spin down after 15 minutes of no traffic.** The next request takes 30-60 seconds (cold start).
+- **Free services spin down after 15 minutes of no traffic.** The next request takes about a minute (cold start) while Render shows a loading page.
 - The 750 free hours are shared across ALL your free services. One service running 24/7 uses ~730 hours.
 - Free services are automatically suspended if you exceed limits.
-- Free PostgreSQL databases are deleted after 90 days.
+- Free PostgreSQL databases expire 30 days after creation, with a 14-day grace period to upgrade before Render deletes them. Max one free Postgres per workspace, 1 GB storage.
 
 ### Workaround for Spin-Down
 
@@ -252,7 +258,22 @@ Use an external cron to ping your service every 14 minutes (not recommended for 
 # Ping every 14 minutes: https://my-express-app.onrender.com/health
 ```
 
-Or upgrade to the Starter plan ($7/month) for always-on services.
+Or use a scheduled GitHub Actions workflow -- costs ~0 Actions minutes and never fails the job on a non-200:
+
+```yaml
+# .github/workflows/keepalive.yml
+name: Keep backend awake
+on:
+  schedule:
+    - cron: "*/14 * * * *"
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl --silent --max-time 30 https://my-express-app.onrender.com/health || echo "ignoring"
+```
+
+Note that keeping one service awake 24/7 uses ~730 of your 750 monthly free hours. Or upgrade to the Starter plan ($7/month) for always-on services.
 
 ---
 
@@ -295,7 +316,7 @@ app.listen(PORT);
 # Start command: uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 
-### Problem: First request is very slow (~30-60 seconds)
+### Problem: First request is very slow (~1 minute)
 
 **Cause:** Free tier spin-down. The service went to sleep after 15 minutes of inactivity.
 

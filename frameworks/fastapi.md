@@ -6,7 +6,7 @@ This guide covers deploying a production-ready FastAPI application to Render's f
 
 ## Prerequisites
 
-- [ ] [Python 3.9+](https://www.python.org/downloads/) installed
+- [ ] [Python 3.13+](https://www.python.org/downloads/) installed (FastAPI and uvicorn require 3.10 minimum; 3.9 is EOL)
 - [ ] [Git](https://git-scm.com/downloads) installed
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] A [Render account](https://render.com/) (sign up with GitHub)
@@ -19,7 +19,9 @@ This guide covers deploying a production-ready FastAPI application to Render's f
 mkdir my-fastapi-app && cd my-fastapi-app
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install fastapi uvicorn[standard] python-dotenv
+pip install "fastapi[standard]" python-dotenv
+# fastapi[standard] bundles uvicorn and the fastapi CLI
+# or with uv: uv venv && uv pip install "fastapi[standard]" python-dotenv
 ```
 
 Create `main.py`:
@@ -69,10 +71,12 @@ pip freeze > requirements.txt
 Or manually create a minimal `requirements.txt`:
 
 ```
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-dotenv==1.0.0
+fastapi==0.139.0
+uvicorn[standard]==0.50.1
+python-dotenv==1.2.2
 ```
+
+Both fastapi and uvicorn now require Python 3.10+.
 
 Create `.gitignore`:
 
@@ -86,7 +90,8 @@ __pycache__/
 Test locally:
 
 ```bash
-uvicorn main:app --reload
+fastapi dev main.py
+# or: uvicorn main:app --reload
 # Open http://localhost:8000
 # API docs at http://localhost:8000/docs
 ```
@@ -113,11 +118,13 @@ git push -u origin main
 3. Connect your GitHub repository
 4. Configure:
    - **Name:** `my-fastapi-app`
-   - **Runtime:** Python
+   - **Language:** Python 3
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
    - **Instance Type:** Free
 5. Click **Create Web Service**
+
+To pin the Python version, add a `.python-version` file (e.g. `3.13`) to the repo root -- Render reads it to select the build image instead of using its default.
 
 Your API is live at `https://my-fastapi-app.onrender.com`. The interactive docs are at `/docs`.
 
@@ -128,9 +135,11 @@ Your API is live at `https://my-fastapi-app.onrender.com`. The interactive docs 
 ### Option A: Neon PostgreSQL + SQLAlchemy
 
 ```bash
-pip install sqlalchemy psycopg2-binary
+pip install sqlalchemy "psycopg[binary]"
 pip freeze > requirements.txt
 ```
+
+Psycopg 3 is the current driver for new projects (psycopg2 is maintenance-only). Use the `postgresql+psycopg://` URL scheme so SQLAlchemy picks it up.
 
 Create `database.py`:
 
@@ -157,15 +166,20 @@ Create `models.py`:
 
 ```python
 from sqlalchemy import Column, Integer, String, DateTime
-from datetime import datetime
+from datetime import datetime, timezone
 from database import Base
 
 class Item(Base):
     __tablename__ = "items"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
 ```
+
+`datetime.utcnow()` is deprecated since Python 3.12; use timezone-aware `datetime.now(timezone.utc)` instead.
 
 Update `main.py`:
 
@@ -214,23 +228,25 @@ def create_item(data: dict, db: Session = Depends(get_db)):
 
 Set `DATABASE_URL` in Render's Environment tab. See the [Neon guide](../guides/neon.md) for setup.
 
-### Option B: MongoDB Atlas + Motor
+### Option B: MongoDB Atlas + PyMongo Async
 
 ```bash
-pip install motor
+pip install pymongo
 pip freeze > requirements.txt
 ```
+
+Motor is deprecated (2026-05-14); MongoDB recommends the PyMongo Async API, a near drop-in replacement for `AsyncIOMotorClient`.
 
 Update `main.py`:
 
 ```python
 import os
 from fastapi import FastAPI
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 app = FastAPI()
 
-client = AsyncIOMotorClient(os.environ["MONGODB_URI"])
+client = AsyncMongoClient(os.environ["MONGODB_URI"])
 db = client["myapp"]
 
 @app.get("/api/items")
@@ -255,7 +271,7 @@ Set `MONGODB_URI` in Render's Environment tab. See the [MongoDB Atlas guide](../
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `PORT` | Server port (auto-set by Render) | `10000` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host/db` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql+psycopg://user:pass@host/db` |
 | `MONGODB_URI` | MongoDB connection string | `mongodb+srv://...` |
 | `SECRET_KEY` | App secret key | `your-secret-key-here` |
 | `CORS_ORIGIN` | Allowed frontend origin | `https://myapp.github.io` |
@@ -335,6 +351,8 @@ app.add_middleware(
 
 Or set `CORS_ORIGIN` as an environment variable on Render.
 
+Note: CORS headers are missing on unhandled 500 responses, so a browser "CORS error" often masks a server error. Check the Render logs before touching CORS config.
+
 ### Problem: 422 Unprocessable Entity on POST requests
 
 **Cause:** Request body doesn't match the expected format, or Content-Type header is missing.
@@ -366,7 +384,19 @@ def create_item(data: ItemCreate, db: Session = Depends(get_db)):
 **Fix:**
 
 1. This is expected on the free tier (30-60 second cold start)
-2. Add a `/health` endpoint for external monitoring
+2. Add a `/health` endpoint and keep the service warm with a scheduled GitHub Actions ping:
+
+```yaml
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl --silent --max-time 30 https://my-fastapi-app.onrender.com/health || echo "ignoring"
+```
+
 3. Upgrade to Starter ($7/month) for always-on
 
 ### Problem: "SSL connection is required" with Neon database
@@ -383,6 +413,8 @@ engine = create_engine(
     connect_args={"sslmode": "require"},
 )
 ```
+
+If you use Neon's pooled connection string, remove `channel_binding=require` from it -- PgBouncer does not support channel binding, and Neon's console includes that parameter by default.
 
 ### Problem: Import error with relative imports
 

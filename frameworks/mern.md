@@ -6,7 +6,7 @@ This guide covers deploying a complete full-stack JavaScript application: a Reac
 
 ## Prerequisites
 
-- [ ] [Node.js 18+](https://nodejs.org/) installed
+- [ ] [Node.js 22+](https://nodejs.org/) installed (24 LTS recommended)
 - [ ] [Git](https://git-scm.com/downloads) installed
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] A [Render account](https://render.com/) (sign up with GitHub)
@@ -141,9 +141,9 @@ app.listen(PORT, '0.0.0.0', () => {
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "dotenv": "^16.3.0",
-    "express": "^4.18.0",
-    "mongoose": "^8.0.0"
+    "dotenv": "^17.4.0",
+    "express": "^5.2.0",
+    "mongoose": "^9.7.0"
   }
 }
 ```
@@ -194,11 +194,11 @@ git push -u origin main
 3. Connect the `mern-server` repository
 4. Configure:
    - **Name:** `mern-server`
-   - **Runtime:** Node
+   - **Language:** Node
    - **Build Command:** `npm install`
    - **Start Command:** `npm start`
    - **Instance Type:** Free
-5. Add environment variables in the **Environment** tab:
+5. Add environment variables under the **Advanced** section of the form:
    - `MONGODB_URI` = your Atlas connection string
    - `CORS_ORIGIN` = `https://<username>.github.io` (you will set this after deploying the frontend)
 6. Click **Create Web Service**
@@ -395,11 +395,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -407,7 +407,7 @@ jobs:
         env:
           VITE_API_URL: https://mern-server.onrender.com
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -419,7 +419,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 ```
 
 ### Enable GitHub Pages
@@ -443,9 +443,9 @@ Your frontend is live at `https://<username>.github.io/mern-client/`.
 Now that the frontend is deployed, update the `CORS_ORIGIN` on Render:
 
 1. Go to your `mern-server` service on Render
-2. Navigate to **Environment** tab
+2. Click **Environment** in the left sidebar
 3. Set `CORS_ORIGIN` to `https://<username>.github.io`
-4. Save (triggers redeploy)
+4. Choose **Save, rebuild, and deploy** (triggers redeploy)
 
 ---
 
@@ -517,7 +517,7 @@ https://<username>.github.io
 
 **Fix:**
 
-1. Check the **Environment** tab on Render -- verify `MONGODB_URI` is set
+1. Check the **Environment** page on Render (left sidebar) -- verify `MONGODB_URI` is set
 2. Go to MongoDB Atlas > **Network Access** > ensure `0.0.0.0/0` is whitelisted
 3. Check Render logs for connection error details
 
@@ -544,6 +544,18 @@ export default defineConfig({
 })
 ```
 
+### Problem: Deep links 404 on GitHub Pages
+
+**Cause:** GitHub Pages only serves static files. It knows nothing about client-side routes, so refreshing or directly opening a route like `/mern-client/todos` returns the Pages 404.
+
+**Fix:** Copy the built `index.html` to `404.html` so Pages serves the SPA for any path. Add this to the build job right after `npm run build`:
+
+```yaml
+- run: cp dist/index.html dist/404.html
+```
+
+If you add React Router, pass `basename={import.meta.env.BASE_URL}` to `BrowserRouter` so routes resolve under the `/mern-client/` subpath.
+
 ### Problem: First API call takes 30-60 seconds
 
 **Cause:** Render free tier spins down after 15 minutes of inactivity.
@@ -553,6 +565,8 @@ export default defineConfig({
 1. Show a loading spinner in the frontend while the backend wakes up
 2. Upgrade to Render Starter ($7/month) for always-on
 3. Use a service like [cron-job.org](https://cron-job.org) to ping `/health` every 14 minutes (for demos only)
+
+Note: free web services share 750 instance hours per workspace per month. One always-pinged service fits within the cap, but multiple kept-awake services will exhaust it and Render suspends all free services until the month resets.
 
 ### Problem: Environment variable is undefined in the frontend build
 

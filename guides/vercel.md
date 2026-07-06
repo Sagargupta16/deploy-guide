@@ -2,14 +2,14 @@
 
 > Deploy frontend apps and serverless functions with zero configuration on Vercel.
 
-Vercel is the company behind Next.js and provides a platform optimized for frontend frameworks. It supports automatic deployments from Git, serverless functions, edge functions, and preview deployments for every pull request.
+Vercel is the company behind Next.js and provides a platform optimized for frontend frameworks. It supports automatic deployments from Git, serverless functions (running on Fluid compute by default, billed on active CPU), edge functions, and preview deployments for every pull request. The Hobby (free) plan includes 100 GB/month data transfer, 1M function invocations/month, and 4 hours/month of active CPU.
 
 ## Prerequisites
 
 - [ ] A [Vercel account](https://vercel.com/signup) (sign up with GitHub for easiest setup)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] [Node.js 18+](https://nodejs.org/)
-- [ ] (Optional) [Vercel CLI](https://vercel.com/docs/cli): `npm i -g vercel`
+- [ ] [Node.js 20+](https://nodejs.org/) (22+ recommended)
+- [ ] (Optional) [Vercel CLI](https://vercel.com/docs/cli): `npm i -g vercel` or `pnpm add -g vercel`
 
 ## Deploy Next.js
 
@@ -40,6 +40,8 @@ git push -u origin main
 5. Click **Deploy**
 
 Your app is live in under a minute. Every push to `main` triggers a new production deploy. Every pull request gets a unique preview URL.
+
+> Tip: to stop bot branches (Renovate, Dependabot) and every feature branch from spinning up preview deployments, set the project's **Ignored Build Step** (Settings > Git) to a command that exits non-zero for any ref other than the branches you want built. Skipped refs spend no build minutes and create no preview URL.
 
 ### Alternative: Deploy via CLI
 
@@ -82,7 +84,7 @@ That's it. No `base` path configuration needed (unlike GitHub Pages).
 
 ## Serverless Functions
 
-Vercel supports serverless functions out of the box. Create files in the `api/` directory at your project root.
+Vercel supports serverless functions out of the box. Create files in the `api/` directory at your project root. Available Node.js runtimes are 24.x (default), 22.x, and 20.x -- set in **Settings** > **Build and Deployment** or via `engines.node` in `package.json`.
 
 ### Example: Node.js API Route
 
@@ -127,6 +129,19 @@ export async function GET(request) {
 
 These are deployed automatically as serverless functions on Vercel.
 
+### Python Functions (FastAPI)
+
+Vercel also runs Python serverless functions. A FastAPI app deploys with a three-line wrapper in `api/index.py`:
+
+```python
+from mangum import Mangum
+from myapp.main import app
+
+handler = Mangum(app, lifespan="off")
+```
+
+plus a `vercel.json` that routes all paths to it. Pin the Python runtime with a `PYTHON_VERSION` env var in the dashboard. Gotcha: FastAPI `BackgroundTasks` are unreliable on serverless -- run post-request work synchronously or hand it to a queue.
+
 ---
 
 ## Environment Variables
@@ -163,6 +178,7 @@ vercel env ls
 - Variables prefixed with `NEXT_PUBLIC_` (Next.js) or `VITE_` (Vite) are exposed to the browser. Never put secrets in these.
 - Server-side environment variables (no prefix) are only available in API routes and serverless functions.
 - After changing env vars, you must redeploy for changes to take effect.
+- If your build reads a database (e.g., Next.js `generateStaticParams` querying it during `next build`), the same variables production needs at runtime must also exist at build time -- in the Vercel project env and in any CI that runs the build. `NEXT_PUBLIC_*` / `VITE_*` values are baked into the bundle at build time, so their build-time value is what ships.
 
 ---
 
@@ -176,19 +192,21 @@ vercel env ls
 
 ### Step 2: Configure DNS
 
-Vercel will show you the required DNS records. Typically:
+Vercel shows the exact DNS records for your project in **Settings** > **Domains** -- copy those values rather than hardcoding ones from a tutorial. Vercel now issues project-specific values: apex domains get a dashboard-provided A record (new domains are commonly issued `216.198.79.1`) and subdomains get a unique per-project CNAME (e.g., `<hash>.vercel-dns-017.com`). The shape looks like:
 
 **For apex domain (`yourdomain.com`):**
 
 | Type | Name | Value |
 |------|------|-------|
-| A | @ | 76.76.21.21 |
+| A | @ | (A record shown in your project's Domains settings) |
 
 **For subdomain (`www.yourdomain.com`):**
 
 | Type | Name | Value |
 |------|------|-------|
-| CNAME | www | cname.vercel-dns.com |
+| CNAME | www | (unique CNAME shown in your project's Domains settings) |
+
+The legacy values (`76.76.21.21` / `cname.vercel-dns.com`) continue to work for existing setups, but Vercel recommends the project-specific values for new domains.
 
 ### Step 3: Verify and SSL
 
@@ -258,12 +276,30 @@ Or trigger a manual redeploy from the Vercel dashboard.
 3. Wait up to 48 hours for propagation (usually much faster)
 4. Try removing and re-adding the domain in Vercel
 
+### Problem: Browser reports a CORS error calling your Vercel API
+
+**Cause:** Often not a CORS misconfiguration at all -- CORS headers are missing on unhandled 500 responses, so a server error surfaces in the browser as "CORS error".
+
+**Fix:**
+
+1. Check the function logs first (**Deployments** > select deploy > **Functions** tab) for an exception
+2. Only then verify your CORS config explicitly allows the frontend's origin (exact scheme + host)
+
+### Problem: Uploads fail with 413 (request body too large)
+
+**Cause:** Vercel caps serverless request bodies at ~4.5 MB at the platform level. App-level limits (e.g., Next.js `experimental.serverActions.bodySizeLimit`) apply independently -- raising one does not lift the other.
+
+**Fix:**
+
+1. Upload large batches a few files at a time so each request stays under ~4.5 MB
+2. For big files, upload directly from the client to object storage (S3/R2 presigned URLs) instead of through the function
+
 ### Problem: Serverless function timeout
 
-**Cause:** Function exceeds the execution time limit (10s on Hobby plan, 60s on Pro).
+**Cause:** Function exceeds the max duration limit. With Fluid compute (enabled by default for new projects), functions default to 300s (5 minutes) on all plans; Hobby maxes out at 300s, Pro/Enterprise can raise `maxDuration` up to 800s (1800s in beta via per-function config).
 
 **Fix:**
 
 1. Optimize the function -- reduce external API calls, use caching
-2. For long-running tasks, consider using Vercel's background functions or a dedicated backend
-3. Upgrade to Pro for longer timeouts if needed
+2. For workloads needing unlimited execution time, use Vercel Workflows (code can pause/resume and maintain state without duration limits) or a dedicated backend
+3. On Pro, raise `maxDuration` in the function config (up to 800s) if needed

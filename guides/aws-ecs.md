@@ -8,9 +8,9 @@ AWS ECS (Elastic Container Service) is a fully managed container orchestration s
 
 - [ ] An [AWS account](https://aws.amazon.com/free/) with billing enabled
 - [ ] [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed and configured
-- [ ] [Docker](https://docs.docker.com/get-docker/) installed locally
+- [ ] [Docker](https://docs.docker.com/get-started/get-docker/) installed locally
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] (Optional) [jq](https://jqlang.github.io/jq/download/) for parsing JSON output
+- [ ] (Optional) [jq](https://jqlang.org/download/) for parsing JSON output
 - [ ] AWS CLI configured with credentials:
 
 ```bash
@@ -67,7 +67,7 @@ Create `package.json`:
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.0"
+    "express": "^5.0.0"
   }
 }
 ```
@@ -77,12 +77,12 @@ Create `package.json`:
 Create `Dockerfile`:
 
 ```dockerfile
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
-FROM node:20-alpine
+FROM node:24-alpine
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
@@ -568,10 +568,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -623,7 +623,7 @@ Go to your repository **Settings** > **Secrets and variables** > **Actions** and
 | `AWS_ACCESS_KEY_ID` | IAM user access key ID |
 | `AWS_SECRET_ACCESS_KEY` | IAM user secret access key |
 
-> **Tip:** For better security, use [OIDC with GitHub Actions](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services) instead of long-lived credentials.
+> **Tip:** For better security, use [OIDC with GitHub Actions](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services) instead of long-lived credentials -- it is the approach AWS and GitHub now recommend. Add `permissions: id-token: write` to the job and pass `role-to-assume` to `configure-aws-credentials` (an IAM role trusting `token.actions.githubusercontent.com` with the `sub` claim scoped to your repo and branch, e.g. `repo:OWNER/REPO:ref:refs/heads/main`). No AWS keys stored as secrets.
 
 ---
 
@@ -642,23 +642,32 @@ aws ecs update-service \
   --cluster $ECS_CLUSTER_NAME \
   --service my-ecs-app-service \
   --force-new-deployment
+
+# Wait for the rollout to stabilize before calling it done
+aws ecs wait services-stable \
+  --cluster $ECS_CLUSTER_NAME \
+  --services my-ecs-app-service
 ```
 
 ---
 
 ## Cost: Free Tier and Pricing
 
-### AWS Free Tier (first 12 months)
+### AWS Free Tier
 
-| Service | Free Allowance |
+For AWS accounts created on or after July 15, 2025, the 12-month free tier no longer exists. New accounts choose a Free or Paid account plan and get USD $100 in credits at signup, plus up to another USD $100 for completing activities (up to $200 total). The Free plan lasts up to 6 months or until credits run out, whichever comes first -- then the account closes unless upgraded to Paid. 30+ always-free services remain, and data transfer from AWS Regions to the internet is free up to 100 GB/month for all customers.
+
+Accounts created before July 15, 2025 keep the legacy 12-month free tier:
+
+| Service | Free Allowance (legacy accounts only) |
 |---------|---------------|
 | EC2 (t2.micro/t3.micro) | 750 hours/month |
 | ECS | No additional charge (pay for underlying compute) |
 | ECR | 500 MB storage/month |
 | ALB | 750 hours + 15 LCUs/month |
-| Data Transfer | 15 GB out/month |
+| Data Transfer | 100 GB out/month (all accounts) |
 
-> **Important:** Fargate is **not** included in the free tier. The EC2 launch type with a t2.micro is free-tier eligible.
+> **Important:** Fargate has no always-free allowance. On new (credits-based) accounts, the signup credits simply offset Fargate's pay-as-you-go pricing. On legacy accounts, only the EC2 launch type with a t2.micro is free-tier eligible.
 
 ### Fargate Pricing (us-east-1)
 
@@ -671,8 +680,9 @@ aws ecs update-service \
 
 - vCPU: 2 x 0.25 x $0.04048 x 730 hrs = ~$14.75
 - Memory: 2 x 0.5 x $0.004445 x 730 hrs = ~$3.25
-- ALB: ~$16/month (after free tier)
-- **Total: ~$34/month**
+- ALB: ~$16.4/month ($0.0225/hour) plus LCU charges ($0.008/LCU-hour)
+- Public IPv4 addresses: 4 x $0.005 x 730 hrs = ~$14.60 (2 task IPs with `assignPublicIp=ENABLED` + 2 ALB IPs across 2 AZs; AWS charges $0.005/hour per public IPv4 since February 1, 2024)
+- **Total: ~$48-49/month**
 
 Use **Fargate Spot** for non-critical workloads to save up to 70%.
 

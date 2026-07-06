@@ -6,7 +6,7 @@ This guide covers deploying a Vite-powered React app to two platforms: **GitHub 
 
 ## Prerequisites
 
-- [ ] [Node.js 18+](https://nodejs.org/) installed
+- [ ] [Node.js 22+](https://nodejs.org/) installed (Vite requires Node 20.19+ or 22.12+; Node 18 and 20 are EOL)
 - [ ] [Git](https://git-scm.com/downloads) installed
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] (For Vercel) A [Vercel account](https://vercel.com/signup)
@@ -20,6 +20,8 @@ npm create vite@latest my-react-app -- --template react
 cd my-react-app
 npm install
 ```
+
+Using pnpm instead? `pnpm create vite my-react-app --template react`, then `pnpm install` (pnpm 11 requires Node 22.13+).
 
 Verify it runs locally:
 
@@ -46,6 +48,8 @@ export default defineConfig({
   base: '/my-react-app/',  // Must match your GitHub repo name
 })
 ```
+
+> **Tip:** To keep the root base in local dev, gate it on an env var: `base: process.env.GITHUB_PAGES === 'true' ? '/my-react-app/' : '/'`, then set `GITHUB_PAGES: 'true'` on the build step in the workflow below.
 
 ### Step 2: Create a GitHub Repository
 
@@ -82,17 +86,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
       - run: npm run build
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -104,7 +108,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 ```
 
 ### Step 4: Enable GitHub Pages
@@ -123,7 +127,7 @@ Your app is live at `https://<username>.github.io/my-react-app/`.
 
 ### Handle Client-Side Routing on GitHub Pages
 
-If you use React Router, create `public/404.html` to handle routing:
+If you use React Router, create `public/404.html` to handle routing. The simplest fix is to copy the built `index.html` to `404.html` in the build step (`cp dist/index.html dist/404.html` after `npm run build` in the workflow) so GitHub Pages serves the SPA for any deep link. Alternatively, use a redirect page:
 
 ```html
 <!DOCTYPE html>
@@ -146,10 +150,10 @@ If you use React Router, create `public/404.html` to handle routing:
 </html>
 ```
 
-And configure React Router with the base path:
+And configure React Router with the base path (React Router 8 installs as `react-router` and imports from `react-router`, not `react-router-dom`). The `basename` must match the `base` in `vite.config.js`, or you can pass `basename={import.meta.env.BASE_URL}` so the two never drift:
 
 ```jsx
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 
 function App() {
   return (
@@ -238,6 +242,8 @@ Access in your code:
 const API_URL = import.meta.env.VITE_API_URL;
 ```
 
+> **Tip:** For local development against a backend, skip CORS setup entirely with Vite's dev proxy in `vite.config.js`: `server: { proxy: { '/api': { target: 'http://localhost:8000', changeOrigin: true } } }`. The app calls relative `/api` paths in dev; production builds bake in `VITE_API_URL` instead.
+
 ---
 
 ## Custom Domain
@@ -252,7 +258,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 1. Go to **Settings** > **Domains** in your Vercel project
 2. Add your domain
-3. Configure DNS as shown by Vercel (typically an A record to `76.76.21.21`)
+3. Configure DNS with the exact A/CNAME values the Vercel dashboard shows for your project (values are per-project; do not copy a generic IP from old tutorials)
 4. SSL is automatic
 
 ---

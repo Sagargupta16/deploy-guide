@@ -4,11 +4,13 @@
 
 Cloudflare Pages is a deployment platform for frontend and full-stack applications. It supports static site hosting with automatic builds from Git, server-side rendering with Cloudflare Functions (Workers), and edge-native data stores like D1 (SQLite) and KV (key-value). If you already use Cloudflare for DNS, adding Pages is seamless.
 
+> **Note:** Since April 2025, Cloudflare recommends starting new projects on [Workers with static assets](https://developers.cloudflare.com/workers/static-assets/) instead of Pages. Pages remains fully supported (and static asset requests are free on both), but all new investment goes into Workers, and some features are Workers-only (Durable Objects, Cron Triggers, fuller observability). An official [migration guide](https://developers.cloudflare.com/workers/static-assets/migration-guides/migrate-from-pages/) covers moving Pages projects to Workers.
+
 ## Prerequisites
 
 - [ ] A [Cloudflare account](https://dash.cloudflare.com/sign-up) (free)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] [Node.js 18+](https://nodejs.org/)
+- [ ] [Node.js 22+](https://nodejs.org/)
 - [ ] (Optional) [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/): `npm install -g wrangler`
 
 ---
@@ -26,7 +28,7 @@ The fastest way to get started is connecting a GitHub repository.
 | Framework | Build Command | Output Directory |
 |-----------|---------------|------------------|
 | React (Vite) | `npm run build` | `dist` |
-| Next.js | `npx @cloudflare/next-on-pages@1` | `.vercel/output/static` |
+| Next.js (static export) | `npm run build` | `out` |
 | Vue (Vite) | `npm run build` | `dist` |
 | Astro | `npm run build` | `dist` |
 | SvelteKit | `npm run build` | `.svelte-kit/cloudflare` |
@@ -105,30 +107,35 @@ No special configuration needed. Works out of the box.
 
 ### Next.js
 
-Next.js on Cloudflare Pages uses the `@cloudflare/next-on-pages` adapter.
+The old `@cloudflare/next-on-pages` adapter is deprecated. On Pages, deploy Next.js as a static export. For full SSR, use Workers with the [OpenNext adapter](https://opennext.js.org/cloudflare) (`@opennextjs/cloudflare`) instead.
 
 ```bash
 npx create-next-app@latest my-next-app
 cd my-next-app
-npm install @cloudflare/next-on-pages
 ```
 
-Update `next.config.js`:
+Update `next.config.js` for static export:
 
 ```js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',  // For static export
-  // OR omit 'output' and use @cloudflare/next-on-pages for full SSR
+  output: 'export',  // Static export -- required for Pages
 };
 
 module.exports = nextConfig;
 ```
 
-For full SSR support, use the adapter as the build command:
+Build settings:
+- **Build command:** `npm run build`
+- **Output directory:** `out`
 
-- **Build command:** `npx @cloudflare/next-on-pages@1`
-- **Output directory:** `.vercel/output/static`
+For full SSR support, deploy to Workers with OpenNext instead of Pages:
+
+```bash
+npm install @opennextjs/cloudflare
+npx opennextjs-cloudflare build
+npx opennextjs-cloudflare deploy
+```
 
 ### Vue (Vite)
 
@@ -459,6 +466,8 @@ export async function onRequestGet(context) {
 
 > **Note:** Variables set in the dashboard are encrypted at rest. Use `wrangler pages secret put` for sensitive values instead of putting them in `wrangler.toml`.
 
+> **Tip:** For OAuth on a static frontend, never ship the client secret to the browser. Put the token exchange (e.g., the `/callback` code-for-token step) in a Pages Function or a small Worker, store the secret with `wrangler pages secret put` (or `wrangler secret put` for a Worker), and keep only non-secret config like `CLIENT_ID` in `wrangler.toml` `[vars]`.
+
 ---
 
 ## Custom Domain
@@ -545,7 +554,7 @@ Create a `_headers` file in your output directory:
 | **Bandwidth** | Unlimited |
 | **Builds** | 500/month |
 | **Concurrent builds** | 1 |
-| **Custom domains** | Unlimited |
+| **Custom domains** | 100 per project |
 | **Pages Functions requests** | 100,000/day |
 | **D1 database storage** | 5 GB |
 | **D1 reads** | 5 million/day |
@@ -574,8 +583,8 @@ Key details:
 
 1. Check the build logs in the Cloudflare dashboard > **Deployments** > click the failed deploy
 2. Set the correct Node.js version:
-   - Add a `NODE_VERSION` environment variable (e.g., `18` or `20`)
-   - Or add an `.nvmrc` file to your repo root: `18`
+   - Add a `NODE_VERSION` environment variable (e.g., `22` or `24`)
+   - Or add an `.nvmrc` or `.node-version` file to your repo root: `22`
 3. Make sure all dependencies are in `package.json`:
 
 ```bash
@@ -684,7 +693,7 @@ export async function onRequestGet(context) {
 }
 ```
 
-3. Keep your function bundle small. Cloudflare limits scripts to 1 MB on the free tier (10 MB on paid).
+3. Keep your function bundle small. Cloudflare limits scripts to 3 MB (after gzip) on the free tier (10 MB on paid).
 
 ### Problem: Custom domain shows "Error 522" or "Error 524"
 

@@ -13,7 +13,7 @@ body:
     attributes:
       label: Framework Name
       description: The name of the framework
-      placeholder: e.g., Django, SvelteKit, Remix
+      placeholder: e.g., Remix, Laravel, Phoenix
     validations:
       required: true
 

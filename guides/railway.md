@@ -2,15 +2,15 @@
 
 > Deploy backend apps and databases instantly with Railway's Git-based workflow and managed infrastructure.
 
-Railway is a modern cloud platform that simplifies deploying web applications and provisioning databases. It supports automatic builds via Nixpacks, GitHub-based deployments, built-in PostgreSQL and Redis add-ons, and a usage-based billing model. Railway handles Dockerfiles, Nixpacks auto-detection, and `railway.toml` configuration for fine-grained control.
+Railway is a modern cloud platform that simplifies deploying web applications and provisioning databases. It supports automatic builds via Railpack (the default builder since 2025-09-19), GitHub-based deployments, built-in PostgreSQL and Redis add-ons, and a usage-based billing model. Railway handles Dockerfiles, Railpack auto-detection, and `railway.toml` configuration for fine-grained control.
 
 ## Prerequisites
 
-- [ ] A [Railway account](https://railway.app/) (sign up with GitHub recommended)
+- [ ] A [Railway account](https://railway.com/) (sign up with GitHub recommended)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] [Node.js 18+](https://nodejs.org/) (for Node.js/Express projects)
-- [ ] [Python 3.9+](https://www.python.org/downloads/) (for FastAPI projects)
-- [ ] (Optional) [Railway CLI](https://docs.railway.app/guides/cli): `npm i -g @railway/cli`
+- [ ] [Node.js 22+](https://nodejs.org/) (for Node.js/Express projects)
+- [ ] [Python 3.10+](https://www.python.org/downloads/) (3.13 recommended, for FastAPI projects)
+- [ ] (Optional) [Railway CLI](https://docs.railway.com/guides/cli): `npm i -g @railway/cli`
 
 ---
 
@@ -49,7 +49,7 @@ Create `package.json`:
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.0"
+    "express": "^5.2.1"
   }
 }
 ```
@@ -69,10 +69,10 @@ git push -u origin main
 
 ### Step 3: Deploy via Dashboard
 
-1. Go to [railway.app/new](https://railway.app/new)
+1. Go to [railway.com/new](https://railway.com/new)
 2. Click **Deploy from GitHub repo**
 3. Select your `my-express-app` repository
-4. Railway auto-detects Node.js via Nixpacks -- no configuration needed
+4. Railway auto-detects Node.js via Railpack -- no configuration needed
 5. Click **Deploy Now**
 
 Railway builds and deploys your app. Click **Generate Domain** under the service settings to get a public URL like `https://my-express-app-production.up.railway.app`.
@@ -122,21 +122,24 @@ def health_check():
 Create `requirements.txt`:
 
 ```
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
+fastapi==0.139.0
+uvicorn[standard]==0.50.1
 ```
 
 ### Step 2: Configure the Start Command
 
-Railway uses Nixpacks to detect Python projects. You can specify the start command in a `railway.toml` or `Procfile`.
+Railway uses Railpack to detect Python projects. When `fastapi` and `uvicorn` are in your dependencies, Railpack auto-detects FastAPI and starts it with `uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}` -- no extra configuration needed.
 
-Create `Procfile`:
+To override the start command, set it in `railway.toml`:
 
+```toml
+[deploy]
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 ```
-web: uvicorn main:app --host 0.0.0.0 --port $PORT
-```
 
-Or set the start command in the Railway dashboard under your service's **Settings** > **Deploy** > **Custom Start Command**.
+Or set it in the Railway dashboard under your service's **Settings** > **Deploy** > **Custom Start Command**.
+
+> **Note:** `Procfile` still works under Railpack but is officially deprecated. Prefer `railway.toml`, `railpack.json`, or the dashboard setting.
 
 ### Step 3: Push to GitHub and Deploy
 
@@ -200,22 +203,24 @@ Create `railway.toml` in your project root for build and deploy configuration:
 
 ```toml
 [build]
-builder = "nixpacks"
+builder = "RAILPACK"
 buildCommand = "npm run build"
 
 [deploy]
 startCommand = "npm start"
 healthcheckPath = "/health"
 healthcheckTimeout = 100
-restartPolicyType = "on_failure"
+restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
 ```
+
+> **Note:** Builder and restart policy values are uppercase: `RAILPACK` (default), `DOCKERFILE`, or `NIXPACKS` (legacy); `ON_FAILURE`, `ALWAYS`, or `NEVER`. Config can also live in `railway.json` instead of `railway.toml`.
 
 ### Python Example
 
 ```toml
 [build]
-builder = "nixpacks"
+builder = "RAILPACK"
 buildCommand = "pip install -r requirements.txt"
 
 [deploy]
@@ -224,22 +229,25 @@ healthcheckPath = "/health"
 healthcheckTimeout = 100
 ```
 
-### Nixpacks Configuration
+### Railpack Configuration
 
-Railway uses [Nixpacks](https://nixpacks.com/) to auto-detect and build your app. Nixpacks supports Node.js, Python, Go, Rust, Java, and many other languages. You can customize the build with a `nixpacks.toml`:
+Railway uses [Railpack](https://railpack.com/) (the default builder since 2025-09-19, replacing Nixpacks) to auto-detect and build your app. Railpack supports Node.js, Python, Go, Rust, Java, PHP, and many other languages, and for Python it detects pip, uv, poetry, pdm, and pipenv. You can customize the build with a `railpack.json`:
 
-```toml
-[phases.setup]
-nixPkgs = ["...", "ffmpeg"]
-
-[phases.install]
-cmds = ["npm ci"]
-
-[phases.build]
-cmds = ["npm run build"]
-
-[start]
-cmd = "npm start"
+```json
+{
+  "$schema": "https://schema.railpack.com",
+  "steps": {
+    "install": {
+      "commands": ["npm ci"]
+    },
+    "build": {
+      "commands": ["npm run build"]
+    }
+  },
+  "deploy": {
+    "startCommand": "npm start"
+  }
+}
 ```
 
 ---
@@ -249,15 +257,15 @@ cmd = "npm start"
 ### Add PostgreSQL
 
 1. Open your project on the Railway dashboard
-2. Click **New** > **Database** > **Add PostgreSQL**
-3. Railway provisions a PostgreSQL instance and sets `DATABASE_URL` automatically
-4. Your app can access the database via `DATABASE_URL`
+2. Click **+ New** on the Project Canvas (or press ctrl/cmd+K) and pick **PostgreSQL**
+3. Railway provisions a PostgreSQL instance and sets `DATABASE_URL` on the database service
+4. In your app service's **Variables** tab, add a reference variable so your app can read it: `DATABASE_URL=${{Postgres.DATABASE_URL}}`
 
 Via CLI:
 
 ```bash
 # Add PostgreSQL to your project
-railway add --plugin postgresql
+railway add --database postgres
 
 # Connect to the database locally
 railway connect postgres
@@ -266,14 +274,15 @@ railway connect postgres
 ### Add Redis
 
 1. Open your project on the Railway dashboard
-2. Click **New** > **Database** > **Add Redis**
-3. Railway provisions a Redis instance and sets `REDIS_URL` automatically
+2. Click **+ New** on the Project Canvas (or press ctrl/cmd+K) and pick **Redis**
+3. Railway provisions a Redis instance and sets `REDIS_URL` on the database service
+4. In your app service's **Variables** tab, add a reference variable: `REDIS_URL=${{Redis.REDIS_URL}}`
 
 Via CLI:
 
 ```bash
 # Add Redis to your project
-railway add --plugin redis
+railway add --database redis
 
 # Connect to Redis locally
 railway connect redis
@@ -314,16 +323,16 @@ async def connect():
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `PORT` | Server port (auto-set by Railway) | `3000` |
-| `DATABASE_URL` | PostgreSQL connection string (auto-set if plugin added) | `postgresql://user:pass@host/db` |
-| `REDIS_URL` | Redis connection string (auto-set if plugin added) | `redis://default:pass@host:6379` |
-| `RAILWAY_ENVIRONMENT` | Current environment name | `production` |
+| `DATABASE_URL` | PostgreSQL connection string (reference it from the database service: `${{Postgres.DATABASE_URL}}`) | `postgresql://user:pass@host/db` |
+| `REDIS_URL` | Redis connection string (reference it from the database service: `${{Redis.REDIS_URL}}`) | `redis://default:pass@host:6379` |
+| `RAILWAY_ENVIRONMENT_NAME` | Current environment name | `production` |
 | `RAILWAY_PUBLIC_DOMAIN` | Public domain of the service | `my-app-production.up.railway.app` |
 | `NODE_ENV` | Node environment | `production` |
 | `SECRET_KEY` | App secret key | `your-secret-key-here` |
 
 ### Set via Dashboard
 
-1. Go to your project on [railway.app](https://railway.app/)
+1. Go to your project on [railway.com](https://railway.com/)
 2. Click on your service
 3. Navigate to the **Variables** tab
 4. Click **New Variable** and enter key-value pairs
@@ -366,25 +375,27 @@ Railway supports shared variables across services in a project. Set them at the 
 
 ### Step 3: Configure DNS
 
-Add the DNS records shown by Railway at your domain registrar:
+Railway shows two DNS records when you add a custom domain: a CNAME record pointing at a Railway-provided endpoint (e.g., `g05ns7.up.railway.app`) and a TXT record used to verify domain ownership. Add both at your domain registrar -- the domain will not verify with only the CNAME in place.
 
 **For subdomain (`api.yourdomain.com`):**
 
 | Type | Name | Value |
 |------|------|-------|
-| CNAME | api | `<your-service>.up.railway.app` |
+| CNAME | api | `<railway-provided-endpoint>.up.railway.app` |
+| TXT | (as shown by Railway) | (verification value from the dashboard) |
 
 **For apex domain (`yourdomain.com`):**
 
 | Type | Name | Value |
 |------|------|-------|
-| CNAME | @ | `<your-service>.up.railway.app` |
+| CNAME | @ | `<railway-provided-endpoint>.up.railway.app` |
+| TXT | (as shown by Railway) | (verification value from the dashboard) |
 
-> **Note:** Some DNS providers do not support CNAME records on the apex domain. In that case, use a CNAME-flattening provider (e.g., Cloudflare) or use a subdomain like `www`.
+> **Note:** Some DNS providers do not support CNAME records on the apex domain. In that case, use a CNAME-flattening provider (e.g., Cloudflare), an ALIAS/ANAME record, or use a subdomain like `www`.
 
 ### Step 4: Verify and SSL
 
-Railway automatically provisions an SSL certificate via Let's Encrypt once DNS propagates. No manual configuration is needed. Verification typically completes in a few minutes.
+Railway automatically provisions an SSL certificate via Let's Encrypt (RSA 2048, 90-day certificates auto-renewed at 30 days remaining) once DNS propagates. No manual configuration is needed. Certificate issuance should happen within an hour of your DNS being updated; DNS propagation itself can take up to 72 hours depending on your provider.
 
 ---
 
@@ -392,21 +403,21 @@ Railway automatically provisions an SSL certificate via Let's Encrypt once DNS p
 
 Railway uses usage-based billing with a trial credit:
 
-| Feature | Trial Plan | Hobby ($5/mo) | Pro ($20/mo) |
-|---------|------------|----------------|--------------|
-| **Credit** | $5 one-time | $5/month included | $20/month included |
-| **Execution Hours** | 500 hours total | Unlimited | Unlimited |
-| **Memory** | Up to 512 MB | Up to 8 GB | Up to 32 GB |
-| **Shared CPU** | Yes | Up to 8 vCPU | Up to 32 vCPU |
-| **Network** | 100 GB egress | 100 GB egress | Unlimited |
-| **Services** | Limited | Unlimited | Unlimited |
-| **Always-On** | Yes (while credits last) | Yes | Yes |
+| Feature | Free Plan | Trial Plan | Hobby ($5/mo) | Pro ($20/seat/mo) |
+|---------|-----------|------------|----------------|--------------|
+| **Credit** | $1/month | $5 one-time (expires in 30 days) | $5/month included | $20/month included |
+| **Memory** | Up to 0.5 GB | Up to 1 GB | Up to 48 GB | Up to 1 TB |
+| **Shared CPU** | 1 vCPU | 2 vCPU | Up to 48 vCPU | Up to 1,000 vCPU |
+| **Network** | Usage-billed ($0.05/GB egress) | Usage-billed ($0.05/GB egress) | Usage-billed ($0.05/GB egress) | Usage-billed ($0.05/GB egress) |
+| **Services** | Limited | 5 per project, 2 replicas | Unlimited | Unlimited |
+| **Always-On** | Yes (while credits last) | Yes (while credits last) | Yes | Yes |
 
 ### Key things to know:
 
-- **Trial gives $5 in free credit.** Once credits are exhausted, services stop until you add a payment method.
+- **Trial gives a one-time $5 credit, no credit card required.** Credits expire in 30 days. After 30 days pass or the $5 is spent, the account reverts to the Free plan ($1 of free credit per month).
+- **When your credit balance reaches zero, workloads are stopped** until you add credits or upgrade.
 - **Railway does NOT spin down free services.** Unlike Render, services are always-on while credits last.
-- **Usage is billed per minute** based on CPU and memory consumption. Idle services still use a small amount of resources.
+- **Usage is billed per second** based on CPU and memory consumption. Idle services still use a small amount of resources.
 - **The Hobby plan** ($5/month) is the lowest paid tier and includes $5 of usage credit. Most small apps cost well under $5/month.
 - Monitor your credit usage in the dashboard under **Usage**.
 
@@ -414,28 +425,24 @@ Railway uses usage-based billing with a trial credit:
 
 ## Troubleshooting
 
-### Problem: Build fails with Nixpacks
+### Problem: Build fails with Railpack
 
-**Cause:** Nixpacks cannot detect your project type or a dependency is missing.
+**Cause:** Railpack cannot detect your project type or a dependency is missing.
 
 **Fix:**
 
 ```bash
 # Make sure your project has the correct files for detection:
 # Node.js: package.json must exist
-# Python: requirements.txt or Pipfile must exist
+# Python: requirements.txt, pyproject.toml, or uv.lock must exist
 
-# Test the Nixpacks build locally
-npx nixpacks build . --name test-build
-
-# If Nixpacks detection fails, specify the builder explicitly in railway.toml:
+# If detection fails, specify the builder explicitly in railway.toml:
 ```
 
 ```toml
 # railway.toml
 [build]
-builder = "nixpacks"
-nixpacksPlan = { providers = ["node"] }
+builder = "RAILPACK"
 ```
 
 Or switch to a Dockerfile-based build:
@@ -443,7 +450,7 @@ Or switch to a Dockerfile-based build:
 ```toml
 # railway.toml
 [build]
-builder = "dockerfile"
+builder = "DOCKERFILE"
 dockerfilePath = "./Dockerfile"
 ```
 
@@ -474,11 +481,11 @@ railway logs
 
 ### Problem: Database connection refused
 
-**Cause:** The app is using a hardcoded connection string instead of the `DATABASE_URL` variable, or the database plugin has not been added.
+**Cause:** The app is using a hardcoded connection string instead of the `DATABASE_URL` variable, the database service has not been added, or the reference variable is missing on the app service.
 
 **Fix:**
 
-1. Verify the PostgreSQL plugin is added to your project (check the dashboard)
+1. Verify the PostgreSQL service is added to your project (check the dashboard)
 2. Ensure your app reads `DATABASE_URL` from the environment:
 
 ```js
@@ -496,7 +503,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 ```
 
 3. Check that the variable is visible in the **Variables** tab of your service
-4. Railway auto-injects database variables into linked services. If the variable is missing, go to the database service and copy the connection string manually
+4. Railway does NOT auto-inject database variables into other services. Add a reference variable on your app service, e.g. `DATABASE_URL=${{Postgres.DATABASE_URL}}`, so it resolves from the database service
 
 ### Problem: Credits running out too fast
 
@@ -513,8 +520,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 NODE_OPTIONS=--max-old-space-size=256
 ```
 
-4. Use Railway's sleep feature for development environments:
-   - Go to service **Settings** > enable **Sleep** to pause the service when not in use
+4. Use Railway's Serverless feature (formerly App Sleeping) for development environments:
+   - Go to service **Settings** > **Deploy** > enable **Enable Serverless**. Railway stops the service after it sends no outbound traffic for at least 10 minutes. In config-as-code this is `deploy.sleepApplication`
 5. Upgrade to the Hobby plan ($5/month) which includes $5 of usage credit each month
 
 ### Problem: Service shows "No active deployment" or fails to start
@@ -525,7 +532,7 @@ NODE_OPTIONS=--max-old-space-size=256
 
 1. Check that your `railway.toml` or dashboard settings have the correct start command
 2. For Node.js, ensure `package.json` has a `start` script
-3. For Python, ensure a `Procfile` or explicit start command is set
+3. For Python, ensure an explicit start command is set (in `railway.toml`, `railpack.json`, or the dashboard -- `Procfile` still works but is deprecated)
 4. Check the build logs for errors:
 
 ```bash

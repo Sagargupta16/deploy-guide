@@ -6,7 +6,7 @@ This guide covers deploying a production-ready Flask application to Render's fre
 
 ## Prerequisites
 
-- [ ] [Python 3.9+](https://www.python.org/downloads/) installed
+- [ ] [Python 3.10+](https://www.python.org/downloads/) installed (3.12 or 3.13 recommended; 3.9 is EOL and gunicorn 26 requires 3.10+)
 - [ ] [Git](https://git-scm.com/downloads) installed
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] A [Render account](https://render.com/) (sign up with GitHub)
@@ -20,6 +20,14 @@ mkdir my-flask-app && cd my-flask-app
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install flask gunicorn python-dotenv flask-cors
+```
+
+Or with [uv](https://docs.astral.sh/uv/), a faster drop-in alternative to venv and pip:
+
+```bash
+uv venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+uv pip install flask gunicorn python-dotenv flask-cors
 ```
 
 Create `app.py`:
@@ -78,8 +86,9 @@ __pycache__/
 .env
 instance/
 *.db
-migrations/
 ```
+
+Do not gitignore `migrations/` -- Flask-Migrate's migration scripts must be committed so `flask db upgrade` can run on Render during the build.
 
 Test locally:
 
@@ -211,8 +220,10 @@ Set `DATABASE_URL` in Render's Environment tab. See the [Neon guide](../guides/n
 Install dependencies:
 
 ```bash
-pip install pymongo[srv]
+pip install pymongo
 ```
+
+`mongodb+srv://` connection strings work out of the box -- dnspython is now a mandatory pymongo dependency, so the old `pymongo[srv]` extra is gone (installing it triggers a pip warning about an unknown extra).
 
 Create `app.py` with MongoDB:
 
@@ -360,14 +371,16 @@ pip freeze > requirements.txt
 Or manually create a minimal `requirements.txt` (SQLAlchemy version):
 
 ```
-flask==3.1.0
-gunicorn==23.0.0
-flask-cors==5.0.0
+flask==3.1.3
+gunicorn==26.0.0
+flask-cors==6.0.5
 flask-sqlalchemy==3.1.1
-flask-migrate==4.0.7
-psycopg2-binary==2.9.10
-python-dotenv==1.0.1
+flask-migrate==4.1.0
+psycopg2-binary==2.9.12
+python-dotenv==1.2.2
 ```
+
+Use flask-cors 6.x -- 5.0.0 ships known CVEs (CVE-2024-6839, CVE-2024-6844, CVE-2024-6866) that were fixed in 6.0.0. Note gunicorn 26 requires Python 3.10+.
 
 Create `build.sh`:
 
@@ -392,11 +405,13 @@ chmod +x build.sh
 Create `.env` (for local development only):
 
 ```bash
-FLASK_ENV=development
+FLASK_DEBUG=1
 SECRET_KEY=local-dev-secret-key
 DATABASE_URL=sqlite:///app.db
 CORS_ORIGIN=http://localhost:5173
 ```
+
+`FLASK_ENV` was removed in Flask 2.3 and does nothing on Flask 3.x. Use `FLASK_DEBUG=1` or `flask run --debug` for local debug mode; never set it in production.
 
 Test with Gunicorn locally:
 
@@ -427,7 +442,7 @@ git push -u origin main
 3. Connect your GitHub repository
 4. Configure:
    - **Name:** `my-flask-app`
-   - **Runtime:** Python
+   - **Language:** Python 3
    - **Build Command:** `./build.sh`
    - **Start Command:** `gunicorn app:app --bind 0.0.0.0:$PORT`
    - **Instance Type:** Free
@@ -450,13 +465,12 @@ curl https://my-flask-app.onrender.com/api/items
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `SECRET_KEY` | Flask secret key | `a3f8b2c1d4e5...` |
-| `FLASK_ENV` | Environment (`production` on Render) | `production` |
 | `DATABASE_URL` | PostgreSQL connection string (SQLAlchemy) | `postgresql://user:pass@host/db` |
 | `MONGODB_URI` | MongoDB connection string (PyMongo) | `mongodb+srv://...` |
 | `DATABASE_NAME` | MongoDB database name | `flask_app` |
 | `CORS_ORIGIN` | Allowed frontend origin | `https://myapp.github.io` |
 | `PORT` | Server port (auto-set by Render) | `10000` |
-| `PYTHON_VERSION` | Python version for Render | `3.12.0` |
+| `PYTHON_VERSION` | Python version for Render (fully qualified) | `3.13.5` |
 
 ### Set on Render
 
@@ -533,13 +547,13 @@ def public_route():
 
 ### Railway
 
-1. Install the Railway CLI: `npm install -g @railway/cli`
+1. Install the Railway CLI: `npm install -g @railway/cli` (or `curl -fsSL agents.railway.com | sh`)
 2. Login: `railway login`
 3. Initialize: `railway init`
-4. Add PostgreSQL: `railway add --plugin postgresql`
+4. Add PostgreSQL: `railway add --database postgres`
 5. Deploy: `railway up`
 
-Railway auto-detects Flask projects from `requirements.txt`. Set `SECRET_KEY` and other variables in the Railway dashboard. The start command defaults to `gunicorn app:app`.
+Railway auto-detects Flask projects from `requirements.txt`. Set `SECRET_KEY` and other variables in the Railway dashboard. Railway's Railpack builder generates a start command that references `main:app`, so for this guide's `app.py` layout set a custom start command in the service settings: `gunicorn app:app --bind 0.0.0.0:$PORT`.
 
 ### Fly.io
 
@@ -547,13 +561,7 @@ Railway auto-detects Flask projects from `requirements.txt`. Set `SECRET_KEY` an
 2. Login: `fly auth login`
 3. Launch: `fly launch`
 
-Fly.io generates a `fly.toml` configuration file. Create a `Procfile` for Fly:
-
-```
-web: gunicorn app:app --bind 0.0.0.0:8080
-```
-
-Or set the start command in `fly.toml`:
+`fly launch` generates a `fly.toml` configuration file and a Dockerfile that runs gunicorn (the old Procfile/buildpack flow is no longer the documented path). Adjust the start command in `fly.toml` if needed:
 
 ```toml
 [processes]
@@ -570,7 +578,7 @@ Deploy with:
 fly deploy
 ```
 
-Fly.io provides persistent volumes and built-in PostgreSQL. Set environment variables with `fly secrets set SECRET_KEY=your-key`.
+Fly.io provides persistent volumes and Managed Postgres (the old app-based "Fly Postgres" is unmanaged and unsupported; use Managed Postgres or an external provider like [Neon](../guides/neon.md)). Set environment variables with `fly secrets set SECRET_KEY=your-key`.
 
 ---
 
@@ -692,6 +700,12 @@ flask db upgrade
 
 If this is a fresh database, run `flask db upgrade` to apply all existing migrations.
 
+### Problem: First request after inactivity is very slow
+
+**Cause:** Render free web services spin down after 15 minutes without inbound traffic; the next request triggers a cold start. Each workspace also gets 750 free instance hours per calendar month (free services are suspended when exhausted).
+
+**Fix:** Expect cold starts on the free tier, or upgrade to a paid instance (Starter, $7/mo) which never spins down.
+
 ### Problem: App works locally but crashes on Render
 
 **Cause:** Missing environment variables, different Python version, or a dependency issue.
@@ -712,4 +726,4 @@ def not_found(error):
     return jsonify({"error": "Not found"}), 404
 ```
 
-4. To pin the Python version, set `PYTHON_VERSION` to `3.12.0` in Render's environment variables
+4. To pin the Python version, set `PYTHON_VERSION` to a fully qualified version (e.g. `3.13.5`) in Render's environment variables, or add a `.python-version` file at the repo root (may omit the patch, e.g. `3.13`). Render's default is Python 3.14.x for services created on or after 2026-02-11.

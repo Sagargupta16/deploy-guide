@@ -25,13 +25,13 @@ docker compose version
 
 ```dockerfile
 # -- Stage 1: Install dependencies --
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # -- Stage 2: Production image --
-FROM node:20-alpine
+FROM node:24-alpine
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 
@@ -50,22 +50,24 @@ CMD ["node", "server.js"]
 **Why this works well:**
 - **Multi-stage build** -- separates dependency installation from the final image, keeping it small
 - **`npm ci`** -- installs exact versions from `package-lock.json` (reproducible builds)
-- **`--only=production`** -- excludes devDependencies from the image
+- **`--omit=dev`** -- excludes devDependencies from the image (the old `--only=production` flag is deprecated)
 - **Alpine base** -- ~50 MB instead of ~350 MB for the full Debian image
 - **Non-root user** -- security best practice (never run as root in production)
-- **HEALTHCHECK** -- lets orchestrators (ECS, Kubernetes, Compose) detect unhealthy containers
+- **HEALTHCHECK** -- lets Docker, Compose (`depends_on: service_healthy`), and Swarm detect unhealthy containers. Note: ECS and Kubernetes do NOT read the Dockerfile HEALTHCHECK -- ECS needs the check declared in the task definition, Kubernetes uses liveness/readiness probes in the Pod spec
+
+**Using pnpm instead of npm?** Enable it via Corepack and use `pnpm fetch` + `pnpm install --prod` in the deps stage (pnpm 11 requires Node 22.13+, so `node:24-alpine` works). See the [official pnpm Docker guide](https://pnpm.io/docker).
 
 ### Python Dockerfile
 
 ```dockerfile
 # -- Stage 1: Install dependencies --
-FROM python:3.12-slim AS builder
+FROM python:3.13-slim AS builder
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # -- Stage 2: Production image --
-FROM python:3.12-slim
+FROM python:3.13-slim
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 WORKDIR /app
 
@@ -82,15 +84,16 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 **Notes:**
-- `python:3.12-slim` is a good balance between size and compatibility (smaller than full, larger than alpine but avoids musl issues)
+- `python:3.13-slim` is a good balance between size and compatibility (smaller than full, larger than alpine but avoids musl issues); `python:3.14-slim` is the newest stable line
 - `--prefix=/install` isolates installed packages for clean copy into the final stage
 - `--no-cache-dir` prevents pip from caching downloaded packages in the image
+- If you use [uv](https://docs.astral.sh/uv/guides/integration/docker/) instead of pip: copy the static binary with `COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/`, then `COPY pyproject.toml uv.lock ./` and `RUN uv sync --locked` -- same layer-caching benefits, much faster installs
 
 ### Go Dockerfile
 
 ```dockerfile
 # -- Stage 1: Build the binary --
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
@@ -129,9 +132,9 @@ Stage 2 (final):   Copy only what you need       --> YOUR IMAGE
 
 | Approach | Image Size |
 |----------|-----------|
-| `node:20` (single stage) | ~350 MB |
-| `node:20-alpine` (single stage) | ~180 MB |
-| `node:20-alpine` (multi-stage) | ~80 MB |
+| `node:24` (single stage) | ~350 MB |
+| `node:24-alpine` (single stage) | ~180 MB |
+| `node:24-alpine` (multi-stage) | ~80 MB |
 
 To verify your image size:
 
@@ -180,6 +183,8 @@ build
 coverage
 .next
 ```
+
+For extra safety, prefer copying only the directories you need (`COPY src/ ./src`) over a blanket `COPY . .` -- belt and suspenders with `.dockerignore` against secrets or `.git` sneaking into image layers.
 
 ---
 
@@ -299,7 +304,7 @@ services:
     restart: unless-stopped
 
   mongo:
-    image: mongo:7
+    image: mongo:8
     ports:
       - "27017:27017"
     volumes:
@@ -335,7 +340,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     ports:
       - "5432:5432"
     environment:
@@ -390,7 +395,7 @@ services:
         condition: service_healthy
 
   mongo:
-    image: mongo:7
+    image: mongo:8
     ports:
       - "27017:27017"
     volumes:
@@ -402,7 +407,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     ports:
       - "6379:6379"
     volumes:
@@ -449,11 +454,32 @@ docker compose exec api sh
 docker compose exec db psql -U postgres -d myapp
 ```
 
+### Compose Watch (modern dev loop)
+
+Instead of relying only on bind-mount volumes, [Compose Watch](https://docs.docker.com/compose/how-tos/file-watch/) syncs file changes and rebuilds automatically:
+
+```yaml
+services:
+  api:
+    build: .
+    develop:
+      watch:
+        - action: sync          # Hot-reload: copy changed files into the container
+          path: ./src
+          target: /app/src
+        - action: rebuild       # Rebuild the image when dependencies change
+          path: package.json
+```
+
+```bash
+docker compose up --watch
+```
+
 ---
 
 ## Health Checks
 
-Health checks tell Docker (and orchestrators like ECS, Kubernetes) whether your container is working correctly.
+Health checks tell Docker whether your container is working correctly. Docker itself, Docker Compose (`depends_on: condition: service_healthy`), and Docker Swarm honor the Dockerfile `HEALTHCHECK`. ECS and Kubernetes do not: ECS only monitors health checks declared in the task definition, and Kubernetes ignores `HEALTHCHECK` entirely in favor of liveness/readiness/startup probes in the Pod spec.
 
 ### In Dockerfile
 
@@ -491,7 +517,8 @@ services:
 |-----------|-------------|-------------|
 | `interval` | Time between checks | 30s |
 | `timeout` | Max time for a check to complete | 5s |
-| `start_period` | Grace period on startup before checks count | 10-60s |
+| `start_period` | Grace period on startup before failures count | 10-60s |
+| `start_interval` | Check interval during the start period (faster "healthy" on boot) | 5s |
 | `retries` | Failures needed to mark unhealthy | 3 |
 
 Check container health status:
@@ -559,22 +586,32 @@ Docker caches each layer. Order your Dockerfile so frequently changing steps com
 ```dockerfile
 # GOOD: dependencies change less often than code
 COPY package*.json ./          # Layer 1: rarely changes
-RUN npm ci --only=production   # Layer 2: cached unless package.json changes
+RUN npm ci --omit=dev          # Layer 2: cached unless package.json changes
 COPY . .                       # Layer 3: changes with every code update
 
 # BAD: code change invalidates dependency cache
 COPY . .                       # Changes every time -> everything below re-runs
-RUN npm ci --only=production   # Re-installs every build
+RUN npm ci --omit=dev          # Re-installs every build
+```
+
+Go further with BuildKit cache mounts -- they persist the package manager's download cache across builds even when the dependency layer is invalidated:
+
+```dockerfile
+# npm
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+
+# pip
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 ```
 
 ### 4. Use Specific Image Tags
 
 ```dockerfile
-# GOOD: pinned version, reproducible
-FROM node:20.11-alpine
+# BEST: pinned to a digest, fully reproducible (Docker Scout can automate digest bumps)
+FROM node:24-alpine@sha256:<digest>
 
-# ACCEPTABLE: major version
-FROM node:20-alpine
+# GOOD: major version of a supported LTS line
+FROM node:24-alpine
 
 # BAD: unpredictable, may break
 FROM node:latest
@@ -657,6 +694,22 @@ Common causes:
 - Missing environment variables (e.g., `DATABASE_URL` not set)
 - Wrong CMD or ENTRYPOINT
 - Application error on startup
+
+### Problem: App runs inside the container but is unreachable from the host
+
+**Cause:** The server is bound to `localhost`/`127.0.0.1` inside the container. That interface is not reachable through the published port.
+
+**Fix:** Bind to `0.0.0.0`:
+
+```dockerfile
+# Python/uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+```js
+// Node.js
+app.listen(3000, '0.0.0.0');
+```
 
 ### Problem: "port is already allocated" error
 

@@ -7,8 +7,8 @@ Upstash provides serverless Redis with a unique REST API, making it ideal for ed
 ## Prerequisites
 
 - [ ] An [Upstash account](https://console.upstash.com/) (sign up with GitHub, Google, or email)
-- [ ] [Node.js 18+](https://nodejs.org/) (for JavaScript usage)
-- [ ] [Python 3.9+](https://www.python.org/downloads/) (for Python usage)
+- [ ] [Node.js 22+](https://nodejs.org/) (for JavaScript usage)
+- [ ] [Python 3.12+](https://www.python.org/downloads/) (for Python usage)
 
 ---
 
@@ -18,12 +18,12 @@ Upstash provides serverless Redis with a unique REST API, making it ideal for ed
 2. Click **Create Database**
 3. Configure:
    - **Name:** `my-cache`
-   - **Type:** Regional (lower latency) or Global (multi-region replication)
-   - **Region:** Select the one closest to your deployment (e.g., `US-East-1` for Vercel/Render)
-   - **TLS:** Enabled (recommended)
+   - **Primary Region:** Select the one closest to your deployment (e.g., `US-East-1` for Vercel/Render)
+   - **Read Regions:** Optional -- add read replicas in regions close to your other traffic
+   - **Plan:** Free to start
 4. Click **Create**
 
-The database is provisioned instantly.
+The database is provisioned instantly. TLS is always enabled -- there is no toggle. (The old Regional database type is deprecated; all new databases use the current region-plus-replicas model.)
 
 ---
 
@@ -444,12 +444,14 @@ await qstash.publishJSON({
 
 ### Scheduled (Cron) Messages
 
+Recurring messages use the Schedules API, not `publishJSON`:
+
 ```js
 // Run every hour
-await qstash.publishJSON({
-  url: 'https://yourapp.com/api/cleanup',
-  body: { task: 'cleanup-expired-sessions' },
+await qstash.schedules.create({
+  destination: 'https://yourapp.com/api/cleanup',
   cron: '0 * * * *',  // Standard cron syntax
+  body: JSON.stringify({ task: 'cleanup-expired-sessions' }),
 });
 ```
 
@@ -509,12 +511,12 @@ UPSTASH_REDIS_REST_TOKEN=AXXXaaaBBBcccDDDeee...
 
 ### Vercel Integration
 
-Upstash has a first-party Vercel integration that auto-provisions a Redis database and sets environment variables:
+Upstash is a native Vercel Marketplace integration that auto-provisions a Redis database and sets environment variables:
 
 1. Go to [vercel.com/integrations/upstash](https://vercel.com/integrations/upstash)
-2. Click **Add Integration**
-3. Select your Vercel project
-4. Upstash creates a database and sets `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` automatically
+2. Click **Install**, then create a new Upstash account (choose product, database name, region, plan) or link an existing one
+3. Connect the database to your Vercel project
+4. Upstash sets `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` automatically -- redeploy your project for the new env vars to take effect
 
 ---
 
@@ -522,28 +524,30 @@ Upstash has a first-party Vercel integration that auto-provisions a Redis databa
 
 | Feature | Free Tier |
 |---------|-----------|
-| **Commands** | 10,000/day |
+| **Commands** | 500,000/month |
 | **Storage** | 256 MB |
+| **Bandwidth** | 10 GB/month |
 | **Concurrent connections** | 100 |
-| **Databases** | 1 |
-| **Max request size** | 1 MB |
-| **QStash messages** | 500/day |
+| **Databases** | 10 |
+| **Max request size** | 10 MB |
+| **QStash messages** | 1,000/day |
 
 Key details:
-- The free tier resets daily at midnight UTC
+- The command quota is monthly, not daily
 - No credit card required
 - Scales to zero -- no charges when idle
 - Global replication is available on paid plans
 - Data persists (not ephemeral like some Redis providers)
-- The 10K daily command limit includes all operations (GET, SET, etc.)
+- The 500K monthly command limit includes all operations (GET, SET, etc.)
+- Beyond 10 free databases, additional ones cost $0.50 per database (up to 100)
 
 ---
 
 ## Troubleshooting
 
-### Problem: "ERR max daily request limit exceeded"
+### Problem: "ERR max requests limit exceeded"
 
-**Cause:** You have exceeded the 10,000 commands/day free tier limit.
+**Cause:** You have exceeded the 500,000 commands/month free tier limit.
 
 **Fix:**
 
