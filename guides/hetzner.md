@@ -6,7 +6,7 @@ Hetzner Cloud is a German IaaS provider with unbeatable EU pricing: the cheapest
 
 ## Prerequisites
 
-- [ ] A [Hetzner account](https://accounts.hetzner.com/signUp) with a payment method (no free tier -- billing starts when a server is created)
+- [ ] A [Hetzner account](https://console.hetzner.com/) with a payment method (no free tier -- billing starts when a server is created)
 - [ ] An SSH key pair (`ssh-keygen -t ed25519` if you don't have one)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
 - [ ] (Optional) A domain name for HTTPS
