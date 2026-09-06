@@ -140,7 +140,7 @@ What are you deploying?
 
 ## Guide Structure
 
-Platform, database, and framework guides follow a consistent format:
+Platform, database, and framework guides are written to this format:
 
 ```
 # Platform/Framework Name
@@ -153,6 +153,8 @@ Platform, database, and framework guides follow a consistent format:
 ## Free Tier Info       (limits table)
 ## Troubleshooting      (5+ common issues with cause/fix)
 ```
+
+Prerequisites, numbered Steps, Environment Variables and Troubleshooting are in every one of those guides. Custom Domain and Free Tier Info are still being backfilled into the older ones, so some do not have them yet -- a PR that adds the missing section is a welcome contribution.
 
 The five reference guides (Docker, DNS & Custom Domains, Environment Variables, CI/CD Templates, Monitoring & Logging) are intentional exceptions -- they document a technique that spans hosts rather than a single platform, so sections like Custom Domain and Free Tier Info do not apply to them.
 

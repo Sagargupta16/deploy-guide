@@ -147,9 +147,9 @@ jobs:
     if: github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
-      # Delete the Amplify branch, then delete the backend CloudFormation
-      # stacks named amplify-<appId>-pr-N-branch-* -- deleting the hosting
-      # branch alone does not remove Gen 2 backend resources
+      # Delete the Amplify branch, then find and delete the branch's backend
+      # CloudFormation stack -- deleting the hosting branch alone does not
+      # remove Gen 2 backend resources. See Troubleshooting for the commands.
 ```
 
 ## Backend Services
@@ -170,7 +170,7 @@ Amplify splits configuration into two stores, and picking the wrong one is a sec
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `AWS_APP_ID` | App ID of the current build (injected) | `d1m7bkiki6tdw1` |
+| `AWS_APP_ID` | App ID of the current build (injected) | `abcd1234` |
 | `AWS_BRANCH` | Branch name of the current build (injected) | `main` |
 | `AWS_COMMIT_ID` | Commit SHA of the current build (injected) | `abcd1234` |
 | `AWS_PULL_REQUEST_ID` | PR number, on preview builds only (injected) | `42` |
@@ -251,7 +251,7 @@ Notes:
 - A custom certificate must already exist in ACM -- Amplify only lets you select from certificates that are there.
 - Attaching a domain that is or was associated with an Amplify app in a **different AWS account in the same region** is a cross-account association and requires manual verification through AWS Support.
 
-## Free Tier and Cost
+## Free Tier Info
 
 | Feature | Monthly allowance | Beyond the allowance |
 |---------|-------------------|----------------------|
@@ -331,15 +331,25 @@ If you need a fully custom build image instead, it must be a glibc Linux distrib
 
 **Cause:** Deleting an Amplify hosting branch removes the hosting branch only. On Gen 2 the backend lives in its own CloudFormation stack, and nothing cleans that up automatically.
 
-**Fix:** Delete the stack as part of the PR-close job.
+**Fix:** Delete the hosting branch, then find and delete the backend stack in the same PR-close job.
 
 ```bash
 aws amplify delete-branch --app-id "$APP_ID" --branch-name "pr-$PR"
-aws cloudformation list-stacks \
-  --query "StackSummaries[?starts_with(StackName, 'amplify-$APP_ID-pr-$PR-branch-')].StackName" \
-  --output text
-aws cloudformation delete-stack --stack-name "$STACK_NAME"
+
+# Find candidate backend stacks for this branch, then delete each one.
+stacks=$(aws cloudformation list-stacks \
+  --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE \
+  --query "StackSummaries[?contains(StackName, '$APP_ID') && contains(StackName, 'pr-$PR')].StackName" \
+  --output text)
+
+echo "matched: $stacks"
+
+for stack in $stacks; do
+  aws cloudformation delete-stack --stack-name "$stack"
+done
 ```
+
+AWS does not document the stack name Amplify Gen 2 gives a branch backend, so the filter above matches on the app ID and branch name rather than a fixed prefix. Echo the match and check it: an empty list means the filter missed, not that nothing is billing. If it comes back empty, open the CloudFormation console, search for the app ID, and confirm by hand before you trust the cleanup.
 
 ### Problem: An environment variable set in the console never reaches the browser
 

@@ -467,12 +467,14 @@ curl https://my-flask-app.onrender.com/api/items
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `SECRET_KEY` | Flask secret key | `a3f8b2c1d4e5...` |
-| `DATABASE_URL` | PostgreSQL connection string (SQLAlchemy) | `postgresql+psycopg://user:pass@host/db` |
+| `DATABASE_URL` | PostgreSQL connection string, exactly as the provider gives it | `postgresql://user:pass@host/db` |
 | `MONGODB_URI` | MongoDB connection string (PyMongo) | `mongodb+srv://...` |
 | `DATABASE_NAME` | MongoDB database name | `flask_app` |
 | `CORS_ORIGIN` | Allowed frontend origin | `https://myapp.github.io` |
 | `PORT` | Server port (auto-set by Render) | `10000` |
 | `PYTHON_VERSION` | Python version for Render (fully qualified) | `3.13.5` |
+
+Store `DATABASE_URL` as the provider hands it to you. Render and Neon give you a `postgresql://` string (older ones say `postgres://`), never a `postgresql+psycopg://` one. Rewrite the scheme to `postgresql+psycopg://` in code so psycopg 3 is used -- see [Database connection fails on Render](#problem-database-connection-fails-on-render) for the three-line version.
 
 ### Set on Render
 

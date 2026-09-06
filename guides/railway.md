@@ -399,7 +399,7 @@ Railway automatically provisions an SSL certificate via Let's Encrypt (RSA 2048,
 
 ---
 
-## Free Tier and Billing
+## Free Tier Info
 
 Railway uses usage-based billing with a trial credit:
 

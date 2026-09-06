@@ -230,7 +230,7 @@ You can trigger deploys from CI/CD pipelines or other services:
 
 ---
 
-## Free Tier Limitations
+## Free Tier Info
 
 Render's free tier has important constraints:
 

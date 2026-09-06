@@ -220,13 +220,12 @@ You can also set up a redirect so `www.yourdomain.com` redirects to `yourdomain.
 
 | Feature | Hobby (free) | Pro ($20/user/mo) |
 |---------|--------------|-------------------|
-| **Data transfer** | 100 GB/month | Usage-based (first 1 TB included) |
 | **Function invocations** | 1M/month | Usage-based |
 | **Active CPU** | 4 hrs/month | Usage-based |
 | **Projects** | 200 | Unlimited |
 | **Deployments** | 100/day, 100 builds/hour | 6,000/day |
 | **Concurrent builds** | 1 | Up to 500 |
-| **Build machine** | 2 vCPU, 8 GB RAM, 32 GB disk | 4 vCPU, 8 GB RAM, upgradable |
+| **Build machine** | Basic: 2 vCPU, 8 GB RAM, 32 GB disk | Elastic by default: 4-30 vCPU, 8-60 GB RAM, auto-scaled |
 | **Build time per deployment** | 45 min | 45 min |
 | **Domains per project** | 50 | Unlimited |
 | **Function max duration** | 300s (5 min) | 300s, configurable higher |
@@ -238,8 +237,9 @@ Key things to know:
 - **Hobby is for non-commercial, personal use only.** That is in Vercel's fair-use guidelines, not a soft suggestion. A revenue-generating site belongs on Pro.
 - Exceeding a Hobby usage limit generally pauses the feature until 30 days have passed, rather than billing you for overage. There is no card on file to charge.
 - Only 1 concurrent build on Hobby, so pushing to several branches at once queues them.
-- Hobby teams cannot connect projects to repositories owned by a **Git organization** -- only personal repos. Moving a project to an org repo means moving to a Team.
+- Hobby teams cannot deploy from a **private** repository owned by a GitHub organization, GitLab group, or Bitbucket workspace. Public org-owned repos are fine; for a private one you either make it public or move to Pro.
 - Functions run on Fluid compute by default and bill on active CPU, so an idle function awaiting I/O costs far less than its wall-clock duration suggests.
+- Hobby always gets the Basic build machine. Larger machines, and the Elastic auto-scaling that picks between them, are Pro and Enterprise only.
 - The build cache is capped at 1 GB and retained for one month.
 
 ---

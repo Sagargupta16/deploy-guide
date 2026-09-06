@@ -21,6 +21,8 @@ npm create cloudflare@latest -- my-worker
 cd my-worker
 ```
 
+The scaffolder asks which language you want. Pick JavaScript and you get `src/index.js`; pick TypeScript and it is `src/index.ts`. This guide uses the JavaScript file, so swap the extension in `main` if you chose TypeScript.
+
 The generated `src/index.js` is the whole contract:
 
 ```js
@@ -49,7 +51,7 @@ Point `assets.directory` at your build output. This is the entire static-hosting
 {
   "name": "my-worker",
   "compatibility_date": "2026-09-06",
-  "main": "./src/index.ts",
+  "main": "./src/index.js",
   "assets": {
     "directory": "./dist/",
     "binding": "ASSETS",
@@ -71,7 +73,7 @@ The four fields that matter:
 
 Default routing without `run_worker_first`: if a file matches the path, it is served directly and **the Worker never runs**. Otherwise the request goes to the Worker. If there is no Worker script at all, the result is a 404.
 
-That default is the important bit for cost. A static site on Workers is effectively free no matter how much traffic it gets, because asset requests are not billed and are not capped.
+That default is the important bit for cost. Cloudflare's wording is that requests to static assets are free and unlimited, and that there is no extra charge for storing them, so a site served entirely out of the asset directory costs nothing to serve.
 
 Use `run_worker_first` when you need code in front of the assets -- an auth check, request logging, or an API path:
 
@@ -330,7 +332,7 @@ What is still missing compared to Pages:
 
 Key things to know:
 
-- The 100,000/day figure counts **Worker invocations, not page views**. A purely static site never touches it, because asset requests are neither billed nor counted.
+- The 100,000/day figure counts **Worker invocations, not page views**. Requests that are served straight from the asset directory are free and unlimited, so a static site is not billed per request.
 - The daily request counter resets at midnight UTC. Exceeding it returns Cloudflare `Error 1027`.
 - 10 ms of CPU time on the free tier is generous in practice, because it measures CPU, not wall clock. Time spent awaiting a `fetch()` or a D1 query does not count.
 - There is no compressed-size limit. Only the uncompressed 64 MiB bundle size is checked.

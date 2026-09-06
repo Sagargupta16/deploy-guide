@@ -17,6 +17,6 @@ Two options:
 
 Please include the file and line, what the guide currently tells a reader to do, and what it should say instead.
 
-Expect an acknowledgement within 7 days. Since a fix here is a documentation edit rather than a release, accepted reports are usually corrected on `main` within a few days of triage.
+A fix here is a documentation edit rather than a release, so an accepted report is corrected on `main` directly and there is nothing to backport. This repo has no staffed response window, so please do not treat silence as a dismissal -- ping the advisory thread if you have not heard back.
 
 Do not include real credentials in a report. If a guide made you leak one, rotate it first.
