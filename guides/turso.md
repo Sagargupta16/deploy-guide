@@ -142,10 +142,10 @@ TURSO_AUTH_TOKEN=eyJhbGciOiJFZERTQSIs...
 
 Two official packages. Pick based on where your code runs:
 
-- **`@tursodatabase/serverless`** (1.2.3 as of 2026-07-06) -- the current quickstart recommendation for remote databases. Fetch-based, zero native dependencies, works on Cloudflare Workers, Vercel Edge, and Deno Deploy.
-- **`@libsql/client`** (0.17.4) -- the classic client. Production-ready, supports Drizzle and Prisma, and is what you want for ORM integration, embedded replicas, or existing codebases. Ships web/edge builds automatically via conditional exports.
+- **`@tursodatabase/serverless`** (1.4.0 as of 2026-09-06) -- the current quickstart recommendation for remote databases. Fetch-based, zero native dependencies, works on Cloudflare Workers, Vercel Edge, and Deno Deploy.
+- **`@libsql/client`** (0.18.0) -- the classic client. Production-ready, supports Drizzle and Prisma, and is what you want for ORM integration, embedded replicas, or existing codebases. Ships web/edge builds automatically via conditional exports.
 
-There is also `@tursodatabase/database` (0.6.1) for local/embedded use in Node.js, Electron, mobile, and IoT.
+There is also `@tursodatabase/database` (0.7.2) for local/embedded use in Node.js, Electron, mobile, and IoT.
 
 ### Option A: @tursodatabase/serverless
 

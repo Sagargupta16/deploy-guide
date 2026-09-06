@@ -87,7 +87,7 @@ Prices are identical across all three eu-central locations. This guide uses `fsn
 
 ## Step 2: Install the hcloud CLI
 
-The official CLI is [hcloud](https://github.com/hetznercloud/cli) (v1.66.0 as of 2026-06-24):
+The official CLI is [hcloud](https://github.com/hetznercloud/cli) (v1.67.0 as of 2026-09-06):
 
 ```bash
 # macOS / Linux (Homebrew)
