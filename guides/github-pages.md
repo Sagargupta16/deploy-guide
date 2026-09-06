@@ -128,7 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -237,7 +237,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -308,6 +308,26 @@ Add these DNS records with your domain registrar:
 3. Check **Enforce HTTPS** (wait for the DNS check to pass first)
 
 DNS propagation can take up to 24 hours, but usually completes within minutes.
+
+## Free Tier Info
+
+GitHub Pages has no paid tier -- there is one set of limits, and most of them are soft.
+
+| Feature | Limit |
+|---------|-------|
+| **Published site size** | 1 GB (hard) |
+| **Source repository size** | 1 GB recommended |
+| **Bandwidth** | 100 GB/month (soft) |
+| **Builds** | 10/hour (soft) |
+| **Deployment timeout** | 10 minutes |
+| **Sites per account** | 1 user/org site, plus 1 per repository |
+| **Custom domain** | Yes, with free auto-renewing HTTPS |
+
+Key things to know:
+
+- The 10 builds/hour limit applies to branch-based deploys only. It **does not apply** if you build and publish with a custom GitHub Actions workflow, which is the approach used throughout this guide.
+- Soft limits mean GitHub asks you to reduce usage rather than cutting you off immediately. Exceeding a rate limit returns HTTP `429`.
+- Pages is for static content. There is no server-side runtime, so no API routes, no server-rendered pages, and no database connections from the site itself.
 
 ## Troubleshooting
 

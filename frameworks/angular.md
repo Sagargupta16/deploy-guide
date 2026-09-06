@@ -2,7 +2,7 @@
 
 > Deploy an Angular 22 app to GitHub Pages, Vercel, Netlify, or Cloudflare Pages, with a detour for SSR and hybrid rendering.
 
-Angular has a built-in deploy hook: `ng deploy` runs whatever deployment builder you added via `ng add`, and the CLI docs list official builders for GitHub Pages, Netlify, Firebase, and S3 (Vercel uses its own `vercel init angular` flow instead). This guide covers the four platforms that make sense on a free tier, plus the three things that trip up every first Angular deploy: the `dist/<project>/browser` output folder, the `--base-href` flag, and the SPA fallback for deep links. Current versions as of 2026-07-06: Angular 22 (released 2026-06-03), `@angular/cli` 22.0.5. Angular v22 requires Node.js `^22.22.3 || ^24.15.0 || ^26.0.0` and TypeScript `>=6.0.0 <6.1.0`; v20 and v21 are in LTS (v20 LTS ends 2026-11-28).
+Angular has a built-in deploy hook: `ng deploy` runs whatever deployment builder you added via `ng add`, and the CLI docs list official builders for GitHub Pages, Netlify, Firebase, and S3 (Vercel uses its own `vercel init angular` flow instead). This guide covers the four platforms that make sense on a free tier, plus the three things that trip up every first Angular deploy: the `dist/<project>/browser` output folder, the `--base-href` flag, and the SPA fallback for deep links. Current versions as of 2026-09-06: Angular 22 (released 2026-06-03), `@angular/cli` 22.1.7. Angular v22 requires Node.js `^22.22.3 || ^24.15.0 || ^26.0.0` and TypeScript `>=6.0.0 <6.1.0`; v20 and v21 are in LTS (v20 LTS ends 2026-11-28).
 
 ## Prerequisites
 
@@ -102,7 +102,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm

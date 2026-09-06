@@ -10,7 +10,7 @@
 
 ## Project
 
-Community repo of 37 step-by-step deployment guides (12 platforms, 14 frameworks, 6 databases, 5 reference guides) for students and indie devs. MIT, public, accepts external PRs.
+Community repo of 38 step-by-step deployment guides (13 platforms, 14 frameworks, 6 databases, 5 reference guides) for students and indie devs. MIT, public, accepts external PRs.
 
 ## Stack
 
@@ -37,7 +37,7 @@ lychee --no-progress --exclude-all-private --accept 200..=299,403,429 "**/*.md"
 ## Entry points
 
 - `README.md` -- index tables, quick decision tree, cost comparison. The front door.
-- `guides/` -- platform, database, and reference guides (23 files)
+- `guides/` -- platform, database, and reference guides (24 files)
 - `frameworks/` -- framework-specific walkthroughs (14 files)
 
 ## Key files
@@ -49,7 +49,7 @@ lychee --no-progress --exclude-all-private --accept 200..=299,403,429 "**/*.md"
 
 ## Gotchas
 
-- Adding/renaming a guide requires updating the matching `README.md` table AND the counts line ("37 guides | 12 platforms | ..."). Filenames are lowercase kebab-case matching the table name.
+- Adding/renaming a guide requires updating the matching `README.md` table AND the counts line ("38 guides | 13 platforms | ..."), plus the counts in this file. Filenames are lowercase kebab-case matching the table name.
 - Platform guides, database guides, and reference guides all live in `guides/`; only framework guides go in `frameworks/`.
 - Pricing and free tiers rot fast (full refresh done 2026-07-06, v1.1.0). When touching prices, verify against the live platform page and update the "Prices last verified" date in `README.md`.
 - lychee fails PRs on dead links; accepts 200-299, 403, 429. If a valid URL blocks bots, add a regex to `.lycheeignore` instead of removing the link.

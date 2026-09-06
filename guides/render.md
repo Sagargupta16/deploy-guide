@@ -103,8 +103,8 @@ def health_check():
 Create `requirements.txt`:
 
 ```
-fastapi==0.139.0
-uvicorn[standard]==0.50.1
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
 ```
 
 > **Tip:** Pin your Python version with a `.python-version` file (e.g. `3.14`) in the repo root. Render reads it to pick the build image; without it, new services default to Python 3.14. Render also supports [uv](https://docs.astral.sh/uv/) natively -- it detects a `uv.lock` in the repo root (pin the uv version with the `UV_VERSION` env var).
@@ -230,7 +230,7 @@ You can trigger deploys from CI/CD pipelines or other services:
 
 ---
 
-## Free Tier Limitations
+## Free Tier Info
 
 Render's free tier has important constraints:
 

@@ -71,9 +71,9 @@ pip freeze > requirements.txt
 Or manually create a minimal `requirements.txt`:
 
 ```
-fastapi==0.139.0
-uvicorn[standard]==0.50.1
-python-dotenv==1.2.2
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-dotenv==1.2.3
 ```
 
 Both fastapi and uvicorn now require Python 3.10+.

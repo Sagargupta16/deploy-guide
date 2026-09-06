@@ -598,7 +598,7 @@ To force HTTPS:
 
 ---
 
-## Free Tier
+## Free Tier Info
 
 Netlify moved to credit-based pricing on 2025-09-04 for new accounts. Instead of separate bandwidth and build-minute quotas, each plan grants a monthly pool of credits that all usage draws from:
 

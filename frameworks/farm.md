@@ -232,11 +232,11 @@ async def delete_item(item_id: str):
 ### Create server/requirements.txt
 
 ```
-fastapi==0.139.0
-uvicorn[standard]==0.50.1
-pymongo==4.17.0
-pydantic-settings==2.14.2
-python-dotenv==1.2.2
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+pymongo==4.18.0
+pydantic-settings==2.15.0
+python-dotenv==1.2.3
 ```
 
 ### Create server/.env (for local development)
@@ -524,7 +524,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm

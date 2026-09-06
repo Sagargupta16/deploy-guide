@@ -107,8 +107,10 @@ flask run
 Install dependencies:
 
 ```bash
-pip install flask-sqlalchemy flask-migrate psycopg2-binary
+pip install flask-sqlalchemy flask-migrate "psycopg[binary]"
 ```
+
+Psycopg 3 is the current driver for new projects (psycopg2 is maintenance-only). Use the `postgresql+psycopg://` URL scheme so SQLAlchemy picks it up. `psycopg2-binary` with a plain `postgresql://` URL still works if you are maintaining an existing project.
 
 Update `app.py` to include SQLAlchemy and migrations:
 
@@ -372,12 +374,12 @@ Or manually create a minimal `requirements.txt` (SQLAlchemy version):
 
 ```
 flask==3.1.3
-gunicorn==26.0.0
+gunicorn==26.2.0
 flask-cors==6.0.5
 flask-sqlalchemy==3.1.1
 flask-migrate==4.1.0
-psycopg2-binary==2.9.12
-python-dotenv==1.2.2
+psycopg[binary]==3.3.5
+python-dotenv==1.2.3
 ```
 
 Use flask-cors 6.x -- 5.0.0 ships known CVEs (CVE-2024-6839, CVE-2024-6844, CVE-2024-6866) that were fixed in 6.0.0. Note gunicorn 26 requires Python 3.10+.
@@ -465,12 +467,14 @@ curl https://my-flask-app.onrender.com/api/items
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `SECRET_KEY` | Flask secret key | `a3f8b2c1d4e5...` |
-| `DATABASE_URL` | PostgreSQL connection string (SQLAlchemy) | `postgresql://user:pass@host/db` |
+| `DATABASE_URL` | PostgreSQL connection string, exactly as the provider gives it | `postgresql://user:pass@host/db` |
 | `MONGODB_URI` | MongoDB connection string (PyMongo) | `mongodb+srv://...` |
 | `DATABASE_NAME` | MongoDB database name | `flask_app` |
 | `CORS_ORIGIN` | Allowed frontend origin | `https://myapp.github.io` |
 | `PORT` | Server port (auto-set by Render) | `10000` |
 | `PYTHON_VERSION` | Python version for Render (fully qualified) | `3.13.5` |
+
+Store `DATABASE_URL` as the provider hands it to you. Render and Neon give you a `postgresql://` string (older ones say `postgres://`), never a `postgresql+psycopg://` one. Rewrite the scheme to `postgresql+psycopg://` in code so psycopg 3 is used -- see [Database connection fails on Render](#problem-database-connection-fails-on-render) for the three-line version.
 
 ### Set on Render
 
@@ -606,12 +610,14 @@ Ensure the build command is `./build.sh` or `pip install -r requirements.txt`.
 **Fix:**
 
 1. Verify `DATABASE_URL` is set in Render's Environment tab
-2. If using Neon, ensure the connection string starts with `postgresql://` (not `postgres://`). SQLAlchemy requires the full `postgresql://` prefix:
+2. If using Neon, ensure the connection string starts with `postgresql://` (not `postgres://`). SQLAlchemy requires the full `postgresql://` prefix, and psycopg 3 needs the `+psycopg` driver suffix:
 
 ```python
 database_url = os.environ.get("DATABASE_URL", "")
 if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
+    database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 ```
 

@@ -2,11 +2,11 @@
 
 > Deploy a SvelteKit 2 app to Vercel, Netlify, Cloudflare, Render, or GitHub Pages by swapping one adapter.
 
-SvelteKit doesn't have one deploy story -- it has adapters. The same app builds into a Vercel function, a Cloudflare Worker, a plain Node server, or a folder of static HTML depending on which adapter you configure in `svelte.config.js`. This guide covers creating a SvelteKit 2 / Svelte 5 app with the current `sv` CLI, then deploying it to five platforms with the right adapter for each, plus environment variables, prerendering, and the base-path dance GitHub Pages requires. Current versions as of 2026-07-06: `@sveltejs/kit` 2.69.1, `svelte` 5.56.4, `sv` CLI 0.16.2. SvelteKit 2 requires Node 18.13+, Vite 5+, and TypeScript 5+.
+SvelteKit doesn't have one deploy story -- it has adapters. The same app builds into a Vercel function, a Cloudflare Worker, a plain Node server, or a folder of static HTML depending on which adapter you configure in `svelte.config.js`. This guide covers creating a SvelteKit 2 / Svelte 5 app with the current `sv` CLI, then deploying it to five platforms with the right adapter for each, plus environment variables, prerendering, and the base-path dance GitHub Pages requires. Current versions as of 2026-09-06: `@sveltejs/kit` 2.70.3, `svelte` 5.57.0, `sv` CLI 0.17.0. SvelteKit 2 requires Node 18.13+, Vite 5+, and TypeScript 5+.
 
 ## Prerequisites
 
-- [ ] [Node.js 20+](https://nodejs.org/) installed (SvelteKit 2 needs 18.13+ minimum; the official GitHub Pages workflow uses Node 20)
+- [ ] [Node.js 22+](https://nodejs.org/) installed (SvelteKit 2 needs 18.13+ minimum, but Node 18 and 20 are EOL -- use 22 or 24 LTS)
 - [ ] [Git](https://git-scm.com/downloads) installed
 - [ ] A [GitHub account](https://github.com/signup)
 - [ ] An account on your target platform: [Vercel](https://vercel.com/signup), [Netlify](https://app.netlify.com/signup), [Cloudflare](https://dash.cloudflare.com/sign-up), or [Render](https://render.com/)
@@ -396,9 +396,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci

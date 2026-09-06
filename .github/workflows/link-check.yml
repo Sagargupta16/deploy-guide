@@ -6,12 +6,42 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   lychee:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: lycheeverse/lychee-action@v2
+      - uses: actions/checkout@v7
+      - id: lychee
+        uses: lycheeverse/lychee-action@v2
         with:
           args: --no-progress --exclude-all-private --accept 200..=299,403,429 "**/*.md"
-          fail: true
+          # Do not fail inside the action: the report step below needs to run
+          # first so a scheduled failure reaches a human instead of dying in
+          # the Actions tab.
+          fail: false
+
+      # Nobody watches the Monday cron. File the report as an issue instead,
+      # reusing an already-open one so consecutive failures do not spam.
+      - name: Report dead links on the scheduled run
+        if: github.event_name == 'schedule' && steps.lychee.outputs.exit_code != 0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create link-rot --color B60205 --description "Dead links found by the scheduled link check" --force
+          existing=$(gh issue list --label link-rot --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file lychee/out.md
+          else
+            gh issue create \
+              --title "Link check failed on $(date -u +%Y-%m-%d)" \
+              --label link-rot \
+              --body-file lychee/out.md
+          fi
+
+      - name: Fail if any link is dead
+        if: steps.lychee.outputs.exit_code != 0
+        run: exit 1

@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -134,7 +134,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -195,7 +195,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -250,7 +250,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
@@ -349,7 +349,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -436,7 +436,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -454,13 +454,15 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Fly CLI
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        uses: superfly/flyctl-actions/setup-flyctl@1.6
 
       - name: Deploy to Fly.io
         run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 ```
+
+`setup-flyctl` is often shown as `@master` in older examples. `master` is a mutable ref -- whatever lands on that branch runs in your pipeline on the next build, with no review and no reproducibility. Pin it to a tag (`@1.6` is the newest, tagged 2026-04-08) or, stricter, to the full commit SHA, the same way you pin every other action here.
 
 **Getting the Fly API token:**
 
@@ -514,7 +516,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -604,7 +606,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -646,7 +648,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup Fly CLI
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        uses: superfly/flyctl-actions/setup-flyctl@1.6
 
       - name: Deploy Preview
         id: deploy
@@ -712,7 +714,7 @@ Caching dramatically speeds up CI builds by reusing downloaded dependencies.
 
 ```yaml
 - name: Setup Node.js
-  uses: actions/setup-node@v6
+  uses: actions/setup-node@v7
   with:
     node-version: 22
     cache: npm   # Automatically caches ~/.npm based on package-lock.json
@@ -738,7 +740,7 @@ Or manual cache control:
 
 ```yaml
 - name: Setup Python
-  uses: actions/setup-python@v6
+  uses: actions/setup-python@v7
   with:
     python-version: "3.14"
     cache: pip   # Automatically caches pip downloads based on requirements.txt
@@ -762,7 +764,7 @@ The [uv](https://docs.astral.sh/uv/) package manager has an official setup actio
 
 ```yaml
 - name: Setup uv
-  uses: astral-sh/setup-uv@v8
+  uses: astral-sh/setup-uv@v10
   with:
     python-version: "3.14"
     enable-cache: true
@@ -809,7 +811,7 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -829,7 +831,7 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -850,7 +852,7 @@ jobs:
         node-version: [22, 24]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
