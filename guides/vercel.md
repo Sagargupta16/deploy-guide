@@ -8,7 +8,7 @@ Vercel is the company behind Next.js and provides a platform optimized for front
 
 - [ ] A [Vercel account](https://vercel.com/signup) (sign up with GitHub for easiest setup)
 - [ ] [Git](https://git-scm.com/downloads) installed locally
-- [ ] [Node.js 20+](https://nodejs.org/) (22+ recommended)
+- [ ] [Node.js 22+](https://nodejs.org/) (Node 18 and 20 are EOL; 24 is the current Active LTS)
 - [ ] (Optional) [Vercel CLI](https://vercel.com/docs/cli): `npm i -g vercel` or `pnpm add -g vercel`
 
 ## Deploy Next.js
@@ -213,6 +213,34 @@ The legacy values (`76.76.21.21` / `cname.vercel-dns.com`) continue to work for 
 Vercel automatically provisions an SSL certificate once DNS propagates. No manual configuration needed.
 
 You can also set up a redirect so `www.yourdomain.com` redirects to `yourdomain.com` (or vice versa) in the Domains settings.
+
+---
+
+## Free Tier Info
+
+| Feature | Hobby (free) | Pro ($20/user/mo) |
+|---------|--------------|-------------------|
+| **Data transfer** | 100 GB/month | Usage-based (first 1 TB included) |
+| **Function invocations** | 1M/month | Usage-based |
+| **Active CPU** | 4 hrs/month | Usage-based |
+| **Projects** | 200 | Unlimited |
+| **Deployments** | 100/day, 100 builds/hour | 6,000/day |
+| **Concurrent builds** | 1 | Up to 500 |
+| **Build machine** | 2 vCPU, 8 GB RAM, 32 GB disk | 4 vCPU, 8 GB RAM, upgradable |
+| **Build time per deployment** | 45 min | 45 min |
+| **Domains per project** | 50 | Unlimited |
+| **Function max duration** | 300s (5 min) | 300s, configurable higher |
+| **Runtime log retention** | 1 hour | 1 day |
+| **Team collaboration** | No | Yes |
+
+Key things to know:
+
+- **Hobby is for non-commercial, personal use only.** That is in Vercel's fair-use guidelines, not a soft suggestion. A revenue-generating site belongs on Pro.
+- Exceeding a Hobby usage limit generally pauses the feature until 30 days have passed, rather than billing you for overage. There is no card on file to charge.
+- Only 1 concurrent build on Hobby, so pushing to several branches at once queues them.
+- Hobby teams cannot connect projects to repositories owned by a **Git organization** -- only personal repos. Moving a project to an org repo means moving to a Team.
+- Functions run on Fluid compute by default and bill on active CPU, so an idle function awaiting I/O costs far less than its wall-clock duration suggests.
+- The build cache is capped at 1 GB and retained for one month.
 
 ---
 

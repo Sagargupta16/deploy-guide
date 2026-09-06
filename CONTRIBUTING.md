@@ -71,6 +71,17 @@ command to set env vars
 2. Include DNS configuration
 3. Include SSL/HTTPS info
 
+## Free Tier Info
+
+| Feature | Free Tier | Cheapest Paid |
+|---------|-----------|---------------|
+| **Limit name** | Free value | Paid value |
+
+Key things to know:
+
+- The one constraint that actually bites on the free tier
+- What happens when you exceed it (throttle, sleep, suspend, bill)
+
 ## Troubleshooting
 
 ### Problem: Description of common problem
