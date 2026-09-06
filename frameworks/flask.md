@@ -126,9 +126,18 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL", "sqlite:///app.db"
-)
+
+# Providers hand you a bare postgresql:// (or legacy postgres://) URL, and
+# SQLAlchemy maps postgresql:// to the psycopg2 dialect. Only psycopg 3 is
+# installed above, so the scheme has to be rewritten or the first query raises
+# ModuleNotFoundError: No module named 'psycopg2'.
+database_url = os.environ.get("DATABASE_URL", "sqlite:///app.db")
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # CORS
