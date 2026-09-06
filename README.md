@@ -1,10 +1,13 @@
 # Deploy Guide
 
+[![Link Check](https://github.com/Sagargupta16/deploy-guide/actions/workflows/link-check.yml/badge.svg)](https://github.com/Sagargupta16/deploy-guide/actions/workflows/link-check.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > Step-by-step deployment guides for every platform and framework. Stop reading docs for hours - deploy in minutes.
 
 Whether you're deploying a React app, a FastAPI backend, or a full-stack MERN project, this repo has a battle-tested guide for it. Every guide includes actual commands, environment variable setup, custom domains, and troubleshooting.
 
-**37 guides** | **12 platforms** | **14 frameworks** | **6 databases** | **5 reference guides**
+**38 guides** | **13 platforms** | **14 frameworks** | **6 databases** | **5 reference guides**
 
 ---
 
@@ -18,6 +21,7 @@ Whether you're deploying a React app, a FastAPI backend, or a full-stack MERN pr
 | [Railway](guides/railway.md) | Full-stack + databases | One-time $5 trial | Any stack |
 | [Fly.io](guides/fly-io.md) | Edge computing, Docker | None (pay-as-you-go) | Docker, Go, multi-region |
 | [Netlify](guides/netlify.md) | JAMstack, forms | 300 credits/mo | Static, serverless, forms |
+| [Cloudflare Workers](guides/cloudflare-workers.md) | Edge-first, static assets + SSR | 100K Worker req/day (assets free) | New edge projects, D1, KV |
 | [Cloudflare Pages](guides/cloudflare-pages.md) | Edge-first, full-stack | Unlimited bandwidth | Static, D1, KV, Workers |
 | [AWS ECS](guides/aws-ecs.md) | Production containers | $100-$200 credits (6 months) | Enterprise, Fargate |
 | [AWS Amplify](guides/aws-amplify.md) | Full-stack serverless | 1000 build min/mo | CI/CD, preview environments |
@@ -76,6 +80,7 @@ What are you deploying?
 |   +-- Need custom domain? --------> GitHub Pages (free forever)
 |   +-- Need serverless functions? --> Vercel or Netlify
 |   +-- Need edge performance? ------> Cloudflare Workers (Pages still works)
+|                                      guides/cloudflare-workers.md
 |   +-- Just want it live fast? -----> Vercel (zero config)
 |
 +-- Backend API (Express, FastAPI, Flask, Django)
@@ -103,7 +108,7 @@ What are you deploying?
 
 ## Cost Comparison
 
-*Prices last verified: 2026-07-06.*
+*Prices last verified: 2026-09-06.* GitHub Pages, Vercel, Render, Railway, Netlify, AWS Amplify, Neon, Supabase, Upstash and Turso were re-checked against vendor pages on that date. Fly.io, Cloudflare, DigitalOcean, AWS ECS, Coolify, Hetzner, MongoDB Atlas and CockroachDB were last fully swept 2026-07-06.
 
 ### Hosting Platforms
 
@@ -115,6 +120,7 @@ What are you deploying?
 | Railway | One-time $5 trial, then $1/mo credit | Hobby ($5/mo) | Yes (while credits last) | Yes | Yes |
 | Fly.io | None (pay-as-you-go, card required) | ~$2/mo (shared-cpu-1x 256MB) | Yes | Yes | Yes |
 | Netlify | 300 credits/mo (~15 GB bandwidth) | Personal ($9/mo) | Yes (until credits run out) | Yes | No |
+| Cloudflare Workers | 100K Worker req/day; static asset requests free and unlimited | $5/mo (Workers Paid) | Yes | Yes | No |
 | Cloudflare Pages | Unlimited bandwidth, 500 builds/mo | $5/mo (Workers Paid) | Yes | Yes | No |
 | DigitalOcean | 3 static-site apps + $200/60-day credit | $4/mo (droplet), $5/mo (container) | Yes | Yes | Yes |
 | AWS ECS | $100-$200 credits, 6-month Free plan | ~$48/mo (2 Fargate tasks + ALB) | Yes | Yes | Yes |
@@ -134,7 +140,7 @@ What are you deploying?
 
 ## Guide Structure
 
-Every guide follows a consistent format:
+Platform, database, and framework guides follow a consistent format:
 
 ```
 # Platform/Framework Name
@@ -147,6 +153,8 @@ Every guide follows a consistent format:
 ## Free Tier Info       (limits table)
 ## Troubleshooting      (5+ common issues with cause/fix)
 ```
+
+The five reference guides (Docker, DNS & Custom Domains, Environment Variables, CI/CD Templates, Monitoring & Logging) are intentional exceptions -- they document a technique that spans hosts rather than a single platform, so sections like Custom Domain and Free Tier Info do not apply to them.
 
 ## Contributing
 
