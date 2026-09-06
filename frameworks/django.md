@@ -270,15 +270,15 @@ pip freeze > requirements.txt
 Or manually create a minimal `requirements.txt`:
 
 ```
-django==6.0.6
-gunicorn==26.0.0
+django==6.1.1
+gunicorn==26.2.0
 whitenoise==6.12.0
 dj-database-url==3.1.2
-psycopg[binary]==3.3.4
-python-dotenv==1.2.2
+psycopg[binary]==3.3.5
+python-dotenv==1.2.3
 ```
 
-Django 6.0 requires Python 3.12+. If you need the LTS line instead, pin `django==5.2.15` (Django 5.2 LTS, supported to April 2028, runs on Python 3.10-3.14). Django recommends psycopg 3 (`psycopg[binary]`); psycopg2 support is likely to be deprecated in a future release.
+Django 6.1 requires Python 3.12+. If you need the LTS line instead, pin `django==5.2.17` (Django 5.2 LTS, supported to April 2028, runs on Python 3.10-3.14). Django recommends psycopg 3 (`psycopg[binary]`); psycopg2 support is likely to be deprecated in a future release.
 
 Create `build.sh` (Render build script):
 
