@@ -158,6 +158,27 @@ Prerequisites, numbered Steps, Environment Variables and Troubleshooting are in 
 
 The five reference guides (Docker, DNS & Custom Domains, Environment Variables, CI/CD Templates, Monitoring & Logging) are intentional exceptions -- they document a technique that spans hosts rather than a single platform, so sections like Custom Domain and Free Tier Info do not apply to them.
 
+## How the Guides Stay Accurate
+
+Deployment docs rot faster than code: free tiers change, CLIs rename commands, and action majors move. The repo is plain Markdown with no build step, so freshness is enforced by process instead:
+
+```mermaid
+flowchart LR
+    PR[Pull request] --> LC[lychee link check]
+    LC -->|all links 2xx/403/429| Merge[Merge to main]
+    LC -->|dead link| Fix[Fix or add to .lycheeignore]
+    Cron[Weekly Monday cron] --> LC2[lychee link check]
+    LC2 -->|dead link| Issue[Open or update a link-rot issue]
+    Refresh[Periodic refresh] --> Prices[Re-check prices against vendor pages]
+    Refresh --> Pins[Bump pinned versions and action majors]
+    Prices --> Changelog[CHANGELOG entry]
+    Pins --> Changelog
+```
+
+- **Links:** [link-check.yml](.github/workflows/link-check.yml) runs [lychee](https://github.com/lycheeverse/lychee) on every PR and every Monday. A scheduled failure files a `link-rot` issue instead of failing silently in the Actions tab.
+- **Prices and free tiers:** each refresh re-checks vendor pricing pages and records the date in [Cost Comparison](#cost-comparison).
+- **Versions:** pinned `requirements.txt` blocks and `uses:` lines in workflow examples are bumped to current releases in each refresh, so copy-pasted snippets do not start out deprecated. What changed and why is in the [CHANGELOG](CHANGELOG.md).
+
 ## Contributing
 
 Contributions are welcome! Whether it's a new platform guide, framework walkthrough, or fixing a broken command.

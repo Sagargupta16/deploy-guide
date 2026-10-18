@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1] - 2026-10-18
+
+- Fix the GitHub Pages SPA redirect in `guides/github-pages.md` and `frameworks/react-vite.md`: both shipped the `404.html` half of the spa-github-pages pattern without the `index.html` decoder, so a deep link such as `/my-react-app/about` was rewritten to `/my-react-app/?/about` and rendered the home route. Added the decoder script next to each `404.html` sample
+- Fix `frameworks/flask.md`: the Option A sample read a bare provider `DATABASE_URL` while only psycopg 3 is installed. It now rewrites `postgresql://` and `postgres://` to `postgresql+psycopg://` in code, matching the env var table and troubleshooting section (#50)
+- Correct the SQLAlchemy driver comments in `frameworks/flask.md` and `guides/neon.md`: SQLAlchemy 2.1 defaults `postgresql://` to psycopg 3, 2.0 still maps it to psycopg2. The explicit `+psycopg` rewrite stays because it works on both. The Neon SSL troubleshooting snippet now names the driver too
+- Refresh drifted `==` pins: django 6.1.2 (LTS 5.2.18), fastapi 0.143.3, uvicorn 0.54.0, psycopg 3.3.6, pydantic-settings 2.16.0, pymongo 4.19.0, python-dotenv 1.2.4
+- README: add a "How the Guides Stay Accurate" section with a diagram of the link-check, refresh and changelog loop
+
 ## [1.2.0] - 2026-09-06
 
 - Add `guides/cloudflare-workers.md`: wrangler + static assets, `assets` config, D1/KV bindings, secrets, custom domains vs routes, and a step-by-step Pages-to-Workers migration. Closes the gap where the README decision tree pointed readers at Workers with no guide behind it
