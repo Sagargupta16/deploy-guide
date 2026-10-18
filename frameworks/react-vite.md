@@ -150,6 +150,22 @@ If you use React Router, create `public/404.html` to handle routing. The simples
 </html>
 ```
 
+The redirect page only encodes the deep link into the query string (`/my-react-app/about` becomes `/my-react-app/?/about`). Add the matching decoder to the `<head>` of your root `index.html`, above the `<script type="module">` tag, or every deep link renders the home route:
+
+```html
+<script>
+  // Decode the ?/ path written by 404.html (from rafgraph/spa-github-pages, MIT)
+  (function (l) {
+    if (l.search[1] === '/') {
+      var decoded = l.search.slice(1).split('&').map(function (s) {
+        return s.replace(/~and~/g, '&');
+      }).join('?');
+      window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+    }
+  }(window.location));
+</script>
+```
+
 And configure React Router with the base path (React Router 8 installs as `react-router` and imports from `react-router`, not `react-router-dom`). The `basename` must match the `base` in `vite.config.js`, or you can pass `basename={import.meta.env.BASE_URL}` so the two never drift:
 
 ```jsx

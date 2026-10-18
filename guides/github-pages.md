@@ -100,6 +100,22 @@ GitHub Pages doesn't natively support client-side routing. Create a `public/404.
 </html>
 ```
 
+That `404.html` only encodes the deep link into the query string (`/my-react-app/about` becomes `/my-react-app/?/about`). Your `index.html` has to decode it back before the router runs, or every deep link lands on the home route. Add this script to the `<head>` of `index.html`, above your app's module script:
+
+```html
+<script>
+  // Decode the ?/ path written by 404.html (from rafgraph/spa-github-pages, MIT)
+  (function (l) {
+    if (l.search[1] === '/') {
+      var decoded = l.search.slice(1).split('&').map(function (s) {
+        return s.replace(/~and~/g, '&');
+      }).join('?');
+      window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+    }
+  }(window.location));
+</script>
+```
+
 > **Tip:** A simpler alternative is to copy the built `index.html` to `404.html` in your deploy workflow (`cp dist/index.html dist/404.html` after the build step) -- Pages then serves your SPA for any deep link. If you use React Router's `BrowserRouter`, its `basename` must also match the Vite base (`<BrowserRouter basename="/my-react-app">`), or assets load but no routes match.
 
 ### Step 4: Deploy with GitHub Actions
