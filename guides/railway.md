@@ -122,8 +122,8 @@ def health_check():
 Create `requirements.txt`:
 
 ```
-fastapi==0.141.1
-uvicorn[standard]==0.52.4
+fastapi==0.143.3
+uvicorn[standard]==0.54.0
 ```
 
 ### Step 2: Configure the Start Command

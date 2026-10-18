@@ -93,7 +93,8 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
 
-# SQLAlchemy defaults postgresql:// to psycopg2 -- point it at psycopg v3
+# SQLAlchemy 2.0 defaults postgresql:// to psycopg2 (2.1+ uses psycopg 3);
+# naming the driver explicitly works on both
 DATABASE_URL = os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+psycopg://", 1)
 
 engine = create_engine(DATABASE_URL, echo=True)
@@ -368,7 +369,7 @@ Neon does not support custom domains for database connections. Use the provided 
 
 ```python
 # Python SQLAlchemy -- append sslmode to URL
-DATABASE_URL = "postgresql://...?sslmode=require"
+DATABASE_URL = "postgresql+psycopg://...?sslmode=require"
 engine = create_engine(DATABASE_URL)
 ```
 
