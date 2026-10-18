@@ -216,7 +216,7 @@ flowchart LR
   On the first run the Django test caught two bugs that every reader of that guide hit: an HTTPS redirect loop on Render (no `SECURE_PROXY_SSL_HEADER`) and a missing `makemigrations` step that left the items table uncreated. Both are fixed in 1.3.0.
 - **Snippets:** [check-snippets.mjs](scripts/check-snippets.mjs) parses every YAML, JSON, JSONC and TOML block and runs [actionlint](https://github.com/rhysd/actionlint) (with shellcheck) over every complete workflow block.
 - **Prices and free tiers:** one row per vendor in [data/platforms.yml](data/platforms.yml) with its own `verified_on` date, rendered into the [Cost Comparison](#cost-comparison) tables.
-- **Versions:** [check-pins.mjs](scripts/check-pins.mjs) compares every `package==x.y.z` pin and every `uses: owner/action@vN` in the guides against PyPI and GitHub releases. The weekly [freshness](.github/workflows/freshness.yml) job files a `pin-drift` issue, and `pnpm check:pins --write` bumps the drifted pins in place.
+- **Versions:** [check-pins.mjs](scripts/check-pins.mjs) compares every `package==x.y.z` pin and every `uses: owner/action@vN` in the guides against PyPI and GitHub releases, and fails on a tag the action never published. The weekly [freshness](.github/workflows/freshness.yml) job files a `pin-drift` issue, and `pnpm check:pins --write` bumps the drifted pins in place.
 - **Links:** [link-check.yml](.github/workflows/link-check.yml) runs [lychee](https://github.com/lycheeverse/lychee) on every PR and every Monday. A scheduled failure files a `link-rot` issue instead of failing silently in the Actions tab.
 
 What changed and why is in the [CHANGELOG](CHANGELOG.md).

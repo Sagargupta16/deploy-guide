@@ -760,11 +760,11 @@ Or manual cache:
 
 ### uv (Python, alternative)
 
-The [uv](https://docs.astral.sh/uv/) package manager has an official setup action with caching built in, replacing the setup-python + cache boilerplate:
+The [uv](https://docs.astral.sh/uv/) package manager has an official setup action with caching built in, replacing the setup-python + cache boilerplate. Since v8 it publishes only full version tags, so `@v10` does not resolve; pin the full version:
 
 ```yaml
 - name: Setup uv
-  uses: astral-sh/setup-uv@v10
+  uses: astral-sh/setup-uv@v10.3.0
   with:
     python-version: "3.14"
     enable-cache: true

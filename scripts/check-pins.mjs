@@ -94,11 +94,23 @@ async function lookup(kind, name) {
    return cache.get(key);
 }
 
+// Some actions (astral-sh/setup-uv since v8) publish only full version tags,
+// so `@v10` looks current against the latest release but fails to resolve.
+async function tagExists(repo, tag) {
+   const key = `tag:${repo}@${tag}`;
+   if (!cache.has(key)) cache.set(key, getJson(`https://api.github.com/repos/${repo}/git/ref/tags/${tag}`, ghHeaders).then(Boolean));
+   return cache.get(key);
+}
+
 const rows = [];
 for (const pin of pins) {
    let info;
    try {
       info = await lookup(pin.kind, pin.name);
+      if (pin.kind === "action" && /^v?\d+(\.\d+)*$/.test(pin.pinned) && !info.error && !(await tagExists(pin.name, pin.pinned))) {
+         rows.push({ ...pin, latest: info.latest, want: info.latest, status: "pinned tag does not exist" });
+         continue;
+      }
    } catch (e) {
       // A network or rate-limit failure is not drift: exit 2 so the weekly
       // job fails loudly instead of filing an issue about it.

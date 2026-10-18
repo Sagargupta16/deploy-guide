@@ -68,7 +68,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm smoke ${{ matrix.guide }}
 
