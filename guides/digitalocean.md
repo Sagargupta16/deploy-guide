@@ -148,7 +148,7 @@ def health_check():
 Create `requirements.txt`:
 
 ```
-fastapi==0.143.3
+fastapi==0.143.5
 uvicorn[standard]==0.54.0
 ```
 

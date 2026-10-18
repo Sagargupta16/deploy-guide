@@ -232,7 +232,7 @@ async def delete_item(item_id: str):
 ### Create server/requirements.txt
 
 ```
-fastapi==0.143.3
+fastapi==0.143.5
 uvicorn[standard]==0.54.0
 pymongo==4.19.0
 pydantic-settings==2.16.0
