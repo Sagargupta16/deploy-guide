@@ -31,6 +31,7 @@ uv pip install django gunicorn whitenoise dj-database-url "psycopg[binary]" pyth
 
 Create the Django project:
 
+<!-- smoke: django scaffold -->
 ```bash
 django-admin startproject config .
 python manage.py startapp core
@@ -59,6 +60,7 @@ my-django-app/
 
 Replace `config/settings.py` with production-ready settings:
 
+<!-- smoke: django config/settings.py -->
 ```python
 import os
 from pathlib import Path
@@ -161,6 +163,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Security settings for production
 if not DEBUG:
+    # Render (like Railway and most PaaS hosts) terminates HTTPS at its proxy
+    # and forwards plain HTTP. Trust its X-Forwarded-Proto header, or Django
+    # treats every request as HTTP and SECURE_SSL_REDIRECT loops forever.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
@@ -176,6 +182,7 @@ if not DEBUG:
 
 Create `core/models.py`:
 
+<!-- smoke: django core/models.py -->
 ```python
 from django.db import models
 
@@ -195,6 +202,7 @@ class Item(models.Model):
 
 Create `core/views.py`:
 
+<!-- smoke: django core/views.py -->
 ```python
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -235,6 +243,7 @@ def item_create(request):
 
 Update `config/urls.py`:
 
+<!-- smoke: django config/urls.py -->
 ```python
 from django.contrib import admin
 from django.urls import path
@@ -251,11 +260,21 @@ urlpatterns = [
 
 Create the static directory so WhiteNoise has something to collect:
 
+<!-- smoke: django dirs -->
 ```bash
 mkdir -p static
 touch static/.gitkeep
 mkdir -p templates
 ```
+
+Create the migration for the `Item` model and commit the generated `core/migrations/` folder. `build.sh` below only applies migrations (`migrate`); it never creates them, so without this step every request that touches `Item` fails with `no such table: core_item` (or `relation "core_item" does not exist` on Postgres):
+
+<!-- smoke: django makemigrations -->
+```bash
+python manage.py makemigrations core
+```
+
+Run it again whenever you change a model.
 
 ---
 
@@ -269,6 +288,7 @@ pip freeze > requirements.txt
 
 Or manually create a minimal `requirements.txt`:
 
+<!-- smoke: django requirements.txt -->
 ```
 django==6.1.2
 gunicorn==26.2.0
@@ -282,6 +302,7 @@ Django 6.1 requires Python 3.12+. If you need the LTS line instead, pin `django=
 
 Create `build.sh` (Render build script):
 
+<!-- smoke: django build.sh -->
 ```bash
 #!/usr/bin/env bash
 set -o errexit
@@ -338,11 +359,11 @@ db.sqlite3
 staticfiles/
 ```
 
-Test locally:
+Test locally. `DEBUG` defaults to `False`, which turns on the HTTPS redirect, so set it for the dev server:
 
 ```bash
 python manage.py migrate
-python manage.py runserver
+DEBUG=True python manage.py runserver   # PowerShell: $env:DEBUG="True"; python manage.py runserver
 # Open http://localhost:8000
 # Test API: curl http://localhost:8000/api/items/
 ```
@@ -550,6 +571,18 @@ my-django-app.onrender.com
 ```
 
 Do not include `https://` -- only the hostname. Separate multiple hosts with commas.
+
+### Problem: "Too many redirects" (ERR_TOO_MANY_REDIRECTS)
+
+**Cause:** `SECURE_SSL_REDIRECT = True` without `SECURE_PROXY_SSL_HEADER`. Render terminates HTTPS at its load balancer and forwards plain HTTP to gunicorn, so Django sees every request as insecure and redirects it to HTTPS again.
+
+**Fix:** Keep the `SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")` line from the settings above. Only set it behind a proxy that overwrites `X-Forwarded-Proto` (Render, Railway, Fly.io, a load balancer); on a bare server a client could send the header itself.
+
+### Problem: "no such table: core_item"
+
+**Cause:** The `core` migrations were never created, so `migrate` in `build.sh` has nothing to apply for `Item`.
+
+**Fix:** Run `python manage.py makemigrations core` locally and commit the `core/migrations/` folder.
 
 ### Problem: collectstatic fails during build
 
