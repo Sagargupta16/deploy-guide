@@ -1,0 +1,142 @@
+# Source of truth for the Cost Comparison tables in README.md.
+#
+# Edit a row here, set verified_on to the day you checked the vendor's
+# pricing page, then run `pnpm gen:tables` to rewrite the README tables.
+# CI fails if the README and this file disagree, and a weekly job opens a
+# `price-check` issue for every row whose verified_on is older than 90 days.
+
+hosting:
+  - name: GitHub Pages
+    guide: guides/github-pages.md
+    free_tier: 1 GB site, 100 GB/mo (soft)
+    cheapest_paid: N/A
+    always_on: "Yes"
+    custom_domain: Yes (free SSL)
+    docker: "No"
+    verified_on: 2026-09-06
+  - name: Vercel
+    guide: guides/vercel.md
+    free_tier: "Hobby: 100 GB transfer, 1M invocations, 4 active-CPU hrs/mo"
+    cheapest_paid: Pro ($20/user/mo)
+    always_on: "Yes"
+    custom_domain: "Yes"
+    docker: "No"
+    verified_on: 2026-09-06
+  - name: Render
+    guide: guides/render.md
+    free_tier: 750 hrs/mo
+    cheapest_paid: Starter ($7/mo)
+    always_on: Paid only
+    custom_domain: "Yes"
+    docker: "Yes"
+    verified_on: 2026-09-06
+  - name: Railway
+    guide: guides/railway.md
+    free_tier: One-time $5 trial, then $1/mo credit
+    cheapest_paid: Hobby ($5/mo)
+    always_on: Yes (while credits last)
+    custom_domain: "Yes"
+    docker: "Yes"
+    verified_on: 2026-09-06
+  - name: Fly.io
+    guide: guides/fly-io.md
+    free_tier: None (pay-as-you-go, card required)
+    cheapest_paid: ~$2/mo (shared-cpu-1x 256MB)
+    always_on: "Yes"
+    custom_domain: "Yes"
+    docker: "Yes"
+    verified_on: 2026-07-06
+  - name: Netlify
+    guide: guides/netlify.md
+    free_tier: 300 credits/mo (~15 GB bandwidth)
+    cheapest_paid: Personal ($9/mo)
+    always_on: Yes (until credits run out)
+    custom_domain: "Yes"
+    docker: "No"
+    verified_on: 2026-09-06
+  - name: Cloudflare Workers
+    guide: guides/cloudflare-workers.md
+    free_tier: 100K Worker req/day; static asset requests free and unlimited
+    cheapest_paid: $5/mo (Workers Paid)
+    always_on: "Yes"
+    custom_domain: "Yes"
+    docker: "No"
+    verified_on: 2026-07-06
+  - name: Cloudflare Pages
+    guide: guides/cloudflare-pages.md
+    free_tier: Unlimited bandwidth, 500 builds/mo
+    cheapest_paid: $5/mo (Workers Paid)
+    always_on: "Yes"
+    custom_domain: "Yes"
+    docker: "No"
+    verified_on: 2026-07-06
+  - name: DigitalOcean
+    guide: guides/digitalocean.md
+    free_tier: 3 static-site apps + $200/60-day credit
+    cheapest_paid: $4/mo (droplet), $5/mo (container)
+    always_on: "Yes"
+    custom_domain: "Yes"
+    docker: "Yes"
+    verified_on: 2026-07-06
+  - name: AWS ECS
+    guide: guides/aws-ecs.md
+    free_tier: $100-$200 credits, 6-month Free plan
+    cheapest_paid: ~$48/mo (2 Fargate tasks + ALB)
+    always_on: "Yes"
+    custom_domain: "Yes"
+    docker: "Yes"
+    verified_on: 2026-07-06
+  - name: Coolify
+    guide: guides/coolify.md
+    free_tier: Free self-hosted (bring a VPS)
+    cheapest_paid: Coolify Cloud ($5/mo)
+    always_on: "Yes"
+    custom_domain: "Yes"
+    docker: "Yes"
+    verified_on: 2026-07-06
+  - name: Hetzner
+    guide: guides/hetzner.md
+    free_tier: None
+    cheapest_paid: ~EUR 6/mo (CX23 + IPv4)
+    always_on: "Yes"
+    custom_domain: "Yes"
+    docker: "Yes"
+    verified_on: 2026-07-06
+
+databases:
+  - name: MongoDB Atlas
+    guide: guides/mongodb-atlas.md
+    free_tier: 512 MB (Free cluster, M0)
+    cheapest_paid: Flex ($8-$30/mo, usage-capped)
+    type: Document
+    verified_on: 2026-07-06
+  - name: Neon
+    guide: guides/neon.md
+    free_tier: 0.5 GB + 100 CU-hrs per project
+    cheapest_paid: Launch (pay-as-you-go, $0.106/CU-hr)
+    type: PostgreSQL
+    verified_on: 2026-09-06
+  - name: Supabase
+    guide: guides/supabase.md
+    free_tier: 500 MB + 50K MAU
+    cheapest_paid: Pro ($25/mo)
+    type: PostgreSQL + BaaS
+    verified_on: 2026-09-06
+  - name: Upstash
+    guide: guides/upstash.md
+    free_tier: 500K cmd/mo
+    cheapest_paid: Pay-as-you-go ($0.20/100K cmds)
+    type: Redis
+    verified_on: 2026-09-06
+  - name: Turso
+    guide: guides/turso.md
+    free_tier: 100 DBs + 5 GB
+    cheapest_paid: Developer ($4.99/mo)
+    type: SQLite (libSQL)
+    verified_on: 2026-09-06
+  - name: CockroachDB
+    guide: guides/cockroachdb.md
+    free_tier: $15/mo credit (10 GiB + 50M RUs)
+    cheapest_paid: Usage beyond free credit
+    type: Distributed SQL
+    verified_on: 2026-07-06

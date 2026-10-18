@@ -26,6 +26,7 @@ pip install "fastapi[standard]" python-dotenv
 
 Create `main.py`:
 
+<!-- smoke: fastapi main.py -->
 ```python
 import os
 from fastapi import FastAPI
@@ -70,8 +71,9 @@ pip freeze > requirements.txt
 
 Or manually create a minimal `requirements.txt`:
 
+<!-- smoke: fastapi requirements.txt -->
 ```
-fastapi==0.143.5
+fastapi==0.144.0
 uvicorn[standard]==0.54.0
 python-dotenv==1.2.4
 ```

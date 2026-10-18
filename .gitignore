@@ -10,3 +10,8 @@ Thumbs.db
 .env.local
 .env.*.local
 *.log
+
+# Docs site build output
+.vitepress/dist/
+.vitepress/cache/
+node_modules/

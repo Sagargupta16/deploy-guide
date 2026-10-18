@@ -114,6 +114,7 @@ Psycopg 3 is the current driver for new projects (psycopg2 is maintenance-only).
 
 Update `app.py` to include SQLAlchemy and migrations:
 
+<!-- smoke: flask app.py -->
 ```python
 import os
 from flask import Flask, jsonify, request
@@ -219,6 +220,7 @@ if __name__ == "__main__":
 
 Initialize migrations:
 
+<!-- smoke: flask migrations -->
 ```bash
 flask db init
 flask db migrate -m "Create items table"
@@ -382,6 +384,7 @@ pip freeze > requirements.txt
 
 Or manually create a minimal `requirements.txt` (SQLAlchemy version):
 
+<!-- smoke: flask requirements.txt -->
 ```
 flask==3.1.3
 gunicorn==26.2.0

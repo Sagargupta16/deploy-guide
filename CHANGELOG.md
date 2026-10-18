@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0] - 2026-10-18
+
+- Add smoke tests that run five guides the way a reader would (`pnpm smoke <test>`): FastAPI, Flask and Django install their pinned requirements and serve under the platform start command (uvicorn or gunicorn) while the test hits every endpoint; React + Vite builds with the GitHub Pages base path and a deep link survives the 404.html redirect; the GitHub Pages encoder and decoder round-trip a deep link. Guide code blocks opt in with an invisible `<!-- smoke: <test> <file> -->` marker, so the tests read the guide text itself
+- Fix `frameworks/django.md`, found by the new smoke test: production settings turned on `SECURE_SSL_REDIRECT` without `SECURE_PROXY_SSL_HEADER`, so behind Render's TLS-terminating proxy every request redirected to HTTPS forever. Added the header setting and a troubleshooting entry
+- Fix `frameworks/django.md`: the guide never ran `makemigrations`, so `migrate` in `build.sh` created no `core_item` table and every items request returned 500. Added the step, a troubleshooting entry, and `DEBUG=True` on the local `runserver` command (with `DEBUG` unset the dev server redirected to HTTPS)
+- Add `pnpm check:snippets`: parses every YAML, JSON, JSONC and TOML block in the guides (73, 26, 12 and 33 blocks today) and runs actionlint with shellcheck over the 24 complete workflow blocks. Quoted the unquoted shell variables it flagged (SC2086) in workflow snippets in `guides/aws-amplify.md`, `guides/aws-ecs.md` and `guides/ci-cd-templates.md`, and marked the Amplify preview workflow as an outline
+- Move the Cost Comparison pricing into `data/platforms.yml` with a `verified_on` date per row. `pnpm gen:tables` renders both README tables from it, now with a Verified column and links to each guide; CI fails if they drift
+- Add `pnpm check:pins`: compares every `package==x.y.z` pin and `uses: owner/action@vN` in the guides and in this repo's workflows (127 pins, 33 distinct packages and actions today) against PyPI and GitHub releases; `--write` bumps drifted pins in place. Its first run found fastapi 0.144.0, released the same day: bumped from 0.143.5 in six guides and re-ran the FastAPI smoke test. It also checks that each action tag exists: `astral-sh/setup-uv` stopped publishing major tags at v8, so `@v10` never resolved. Pinned it to `v10.3.0` in `guides/ci-cd-templates.md` and in `guides-ci.yml`
+- Add a weekly freshness workflow that opens or updates a `price-check` issue for pricing rows older than 90 days and a `pin-drift` issue for drifted pins
+- Add a VitePress docs site built from the same Markdown: local search, a sidebar parsed from the README tables, dark mode, last-updated dates, edit links, client-rendered mermaid diagrams, and phone layouts where tables and mermaid diagrams scroll sideways instead of shrinking (labels stay at 13px or more on a 390px screen). `.github/workflows/docs.yml` publishes it to GitHub Pages; `pnpm screenshots` captures the README showcase images
+- Add `guides-ci.yml`: actionlint on the repo's own workflows, snippet and table checks, the site build, and the smoke matrix on every PR and every Monday; a scheduled failure opens a `guide-smoke` issue
+- README: replace the ASCII decision tree with a mermaid flowchart (each leaf links to its guide on the docs site), rewrite "How the Guides Stay Accurate" for the new checks, and add a Docs Site section with desktop and phone screenshots
+- CONTRIBUTING: document the local checks, the snippet markers and the pricing data file
+
 ## [1.2.1] - 2026-10-18
 
 - Fix the GitHub Pages SPA redirect in `guides/github-pages.md` and `frameworks/react-vite.md`: both shipped the `404.html` half of the spa-github-pages pattern without the `index.html` decoder, so a deep link such as `/my-react-app/about` was rewritten to `/my-react-app/?/about` and rendered the home route. Added the decoder script next to each `404.html` sample
