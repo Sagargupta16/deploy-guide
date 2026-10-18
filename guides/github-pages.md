@@ -77,6 +77,7 @@ export default defineConfig({
 
 GitHub Pages doesn't natively support client-side routing. Create a `public/404.html` that redirects to `index.html`:
 
+<!-- smoke: github-pages 404.html -->
 ```html
 <!DOCTYPE html>
 <html>
@@ -102,6 +103,7 @@ GitHub Pages doesn't natively support client-side routing. Create a `public/404.
 
 That `404.html` only encodes the deep link into the query string (`/my-react-app/about` becomes `/my-react-app/?/about`). Your `index.html` has to decode it back before the router runs, or every deep link lands on the home route. Add this script to the `<head>` of `index.html`, above your app's module script:
 
+<!-- smoke: github-pages index.html-decoder -->
 ```html
 <script>
   // Decode the ?/ path written by 404.html (from rafgraph/spa-github-pages, MIT)

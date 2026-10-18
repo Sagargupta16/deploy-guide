@@ -15,6 +15,7 @@ This guide covers deploying a Vite-powered React app to two platforms: **GitHub 
 
 ## Create the App
 
+<!-- smoke: react-vite create -->
 ```bash
 npm create vite@latest my-react-app -- --template react
 cd my-react-app
@@ -39,6 +40,7 @@ Open `http://localhost:5173` to confirm it works.
 
 Edit `vite.config.js`:
 
+<!-- smoke: react-vite vite.config.js -->
 ```js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -129,6 +131,7 @@ Your app is live at `https://<username>.github.io/my-react-app/`.
 
 If you use React Router, create `public/404.html` to handle routing. The simplest fix is to copy the built `index.html` to `404.html` in the build step (`cp dist/index.html dist/404.html` after `npm run build` in the workflow) so GitHub Pages serves the SPA for any deep link. Alternatively, use a redirect page:
 
+<!-- smoke: react-vite public/404.html -->
 ```html
 <!DOCTYPE html>
 <html>
@@ -152,6 +155,7 @@ If you use React Router, create `public/404.html` to handle routing. The simples
 
 The redirect page only encodes the deep link into the query string (`/my-react-app/about` becomes `/my-react-app/?/about`). Add the matching decoder to the `<head>` of your root `index.html`, above the `<script type="module">` tag, or every deep link renders the home route:
 
+<!-- smoke: react-vite index.html-decoder -->
 ```html
 <script>
   // Decode the ?/ path written by 404.html (from rafgraph/spa-github-pages, MIT)

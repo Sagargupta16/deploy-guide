@@ -385,9 +385,9 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Update ECS task definition
         id: task-def
@@ -655,7 +655,7 @@ jobs:
         run: |
           flyctl apps create pr-${{ github.event.pull_request.number }} --org personal || true
           flyctl deploy --app pr-${{ github.event.pull_request.number }} --remote-only
-          echo "url=https://pr-${{ github.event.pull_request.number }}.fly.dev" >> $GITHUB_OUTPUT
+          echo "url=https://pr-${{ github.event.pull_request.number }}.fly.dev" >> "$GITHUB_OUTPUT"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 

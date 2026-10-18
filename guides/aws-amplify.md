@@ -104,14 +104,14 @@ jobs:
       # Upload to Amplify Hosting
       - run: |
           BRANCH_NAME="main"
-          aws amplify create-branch --app-id ${{ secrets.AMPLIFY_APP_ID }} --branch-name $BRANCH_NAME 2>/dev/null || true
+          aws amplify create-branch --app-id ${{ secrets.AMPLIFY_APP_ID }} --branch-name "$BRANCH_NAME" 2>/dev/null || true
           ZIP_FILE=$(mktemp).zip
-          cd dist && zip -r $ZIP_FILE . && cd ..
-          DEPLOYMENT=$(aws amplify create-deployment --app-id ${{ secrets.AMPLIFY_APP_ID }} --branch-name $BRANCH_NAME)
+          cd dist && zip -r "$ZIP_FILE" . && cd ..
+          DEPLOYMENT=$(aws amplify create-deployment --app-id ${{ secrets.AMPLIFY_APP_ID }} --branch-name "$BRANCH_NAME")
           JOB_ID=$(echo "$DEPLOYMENT" | jq -r '.jobId')
           UPLOAD_URL=$(echo "$DEPLOYMENT" | jq -r '.zipUploadUrl')
-          curl -X PUT -T $ZIP_FILE "$UPLOAD_URL"
-          aws amplify start-deployment --app-id ${{ secrets.AMPLIFY_APP_ID }} --branch-name $BRANCH_NAME --job-id $JOB_ID
+          curl -X PUT -T "$ZIP_FILE" "$UPLOAD_URL"
+          aws amplify start-deployment --app-id ${{ secrets.AMPLIFY_APP_ID }} --branch-name "$BRANCH_NAME" --job-id "$JOB_ID"
 ```
 
 `create-deployment` only stages the upload URL -- without `start-deployment` (using the returned `jobId`) the zip is never published. Poll `aws amplify get-job` if you need to wait for SUCCEED/FAILED.
@@ -125,8 +125,9 @@ Two things to set up once in the Amplify console before an external pipeline wor
 
 ## Step 4: Preview Environments (Per PR)
 
-Add a second workflow for PR previews:
+Add a second workflow for PR previews. This one is an outline: fill each job's steps from the deploy workflow above.
 
+<!-- snippet: outline -->
 ```yaml
 # .github/workflows/preview.yml
 name: Preview
