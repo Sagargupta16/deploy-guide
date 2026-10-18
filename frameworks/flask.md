@@ -127,10 +127,11 @@ load_dotenv()
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
-# Providers hand you a bare postgresql:// (or legacy postgres://) URL, and
-# SQLAlchemy maps postgresql:// to the psycopg2 dialect. Only psycopg 3 is
-# installed above, so the scheme has to be rewritten or the first query raises
-# ModuleNotFoundError: No module named 'psycopg2'.
+# Providers hand you a bare postgresql:// (or legacy postgres://) URL.
+# SQLAlchemy 2.0 maps postgresql:// to the psycopg2 dialect (2.1+ defaults to
+# psycopg 3), and SQLAlchemy rejects postgres:// outright. Only psycopg 3 is
+# installed above, so rewrite the scheme explicitly: it works on every
+# SQLAlchemy 2.x and avoids ModuleNotFoundError: No module named 'psycopg2'.
 database_url = os.environ.get("DATABASE_URL", "sqlite:///app.db")
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
@@ -387,8 +388,8 @@ gunicorn==26.2.0
 flask-cors==6.0.5
 flask-sqlalchemy==3.1.1
 flask-migrate==4.1.0
-psycopg[binary]==3.3.5
-python-dotenv==1.2.3
+psycopg[binary]==3.3.6
+python-dotenv==1.2.4
 ```
 
 Use flask-cors 6.x -- 5.0.0 ships known CVEs (CVE-2024-6839, CVE-2024-6844, CVE-2024-6866) that were fixed in 6.0.0. Note gunicorn 26 requires Python 3.10+.
