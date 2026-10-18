@@ -112,13 +112,39 @@ command to fix it
 - Use lowercase kebab-case for filenames: `github-pages.md`, `react-vite.md`
 - Match the name used in `README.md` tables
 
+## Checks
+
+The guides are Markdown, but CI tests them like code. Install the tooling once with [pnpm](https://pnpm.io/) (Node 22.12+), then run the same checks locally:
+
+```bash
+pnpm install
+pnpm check              # parse YAML/JSON/TOML blocks, lint workflow blocks, README tables vs data
+pnpm smoke --list       # smoke tests: fastapi, flask, django, react-vite, github-pages
+pnpm smoke django       # run one (Python tests need uv: https://docs.astral.sh/uv/)
+pnpm docs:dev           # preview the docs site at http://localhost:5173/deploy-guide/
+```
+
+`pnpm check:snippets` runs actionlint on workflow blocks when `actionlint` is on your PATH; CI always does.
+
+### Snippet markers
+
+Two invisible HTML comments on the line above a code fence tell the checks how to treat it:
+
+- `<!-- smoke: <test> <file> -->` -- the smoke test `<test>` writes this block to `<file>` (or runs it with bash, if the test calls `runBlock`). If you edit a marked block, run that smoke test. The steps between the blocks live in [scripts/smoke/](scripts/smoke/).
+- `<!-- snippet: outline -->` -- a workflow that is deliberately a sketch (comments where the steps go). It must still parse as YAML, but actionlint skips it.
+
+### Prices
+
+Pricing in the README Cost Comparison tables comes from [data/platforms.yml](data/platforms.yml). Edit the row, set `verified_on` to the day you checked the vendor's pricing page, and run `pnpm gen:tables`. Do not edit the generated tables by hand: CI fails if they differ from the data file.
+
 ## Pull Request Process
 
 1. Ensure your guide follows the template above
-2. Add your guide to the appropriate table in `README.md`
+2. Add your guide to the appropriate table in `README.md` (the docs site sidebar is built from those tables)
 3. Test all commands on a fresh project
-4. Fill out the PR template completely
-5. A maintainer will review your PR within a few days
+4. Run `pnpm check`, plus `pnpm smoke <test>` if you changed a smoke-tested guide
+5. Fill out the PR template completely
+6. A maintainer will review your PR within a few days
 
 ## Code of Conduct
 

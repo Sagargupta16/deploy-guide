@@ -1,0 +1,96 @@
+name: Guides CI
+
+# Docs-as-code checks: the guides' snippets must parse and lint, the README
+# tables must match data/platforms.yml, the docs site must build, and the
+# smoke tests must be able to run the apps the guides walk through.
+# The weekly run catches upstream drift (a new create-vite, a yanked pin)
+# even when nobody touches the repo.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guides-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ACTIONLINT_VERSION: 1.7.12
+
+jobs:
+  snippets:
+    name: Snippets, tables and site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install actionlint
+        run: |
+          bash <(curl -sSfL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "$ACTIONLINT_VERSION"
+          echo "$PWD" >> "$GITHUB_PATH"
+
+      - name: Lint this repo's own workflows
+        run: actionlint
+
+      - name: Parse and lint every code block in the guides
+        run: pnpm check:snippets
+
+      - name: README tables match data/platforms.yml
+        run: pnpm check:tables
+
+      - name: Build the docs site
+        run: pnpm docs:build
+
+  smoke:
+    name: Smoke ${{ matrix.guide }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        guide: [fastapi, flask, django, react-vite, github-pages]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v10
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm smoke ${{ matrix.guide }}
+
+  report:
+    name: Report scheduled failures
+    needs: [snippets, smoke]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update a guide-smoke issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create guide-smoke --color D93F0B --description "A guide's commands stopped working in the weekly smoke test" --force
+          body="The weekly Guides CI run failed: $RUN_URL"$'\n\n'"Open the failed job to see which guide step broke."
+          existing=$(gh issue list --label guide-smoke --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "Guide smoke test failed on $(date -u +%Y-%m-%d)" --label guide-smoke --body "$body"
+          fi

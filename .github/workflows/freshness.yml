@@ -1,0 +1,67 @@
+name: Freshness
+
+# Weekly: flag pricing rows not re-verified in 90 days and version pins that
+# drifted behind the latest release. Each finding becomes (or updates) one
+# open issue, the same way the link check reports dead links.
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - id: prices
+        name: Pricing rows older than 90 days
+        run: |
+          set +e
+          pnpm --silent check:prices --md prices.md
+          echo "stale=$?" >> "$GITHUB_OUTPUT"
+
+      - id: pins
+        name: Pinned versions behind the latest release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          pnpm --silent check:pins --md pins.md
+          echo "drift=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Report
+        if: steps.prices.outputs.stale == '1' || steps.pins.outputs.drift == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STALE: ${{ steps.prices.outputs.stale }}
+          DRIFT: ${{ steps.pins.outputs.drift }}
+        run: |
+          report() {
+            label=$1 title=$2 body=$3
+            gh label create "$label" --color FBCA04 --description "$title (weekly freshness job)" --force
+            existing=$(gh issue list --label "$label" --state open --limit 1 --json number --jq '.[0].number // empty')
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --body-file "$body"
+            else
+              gh issue create --title "$title ($(date -u +%Y-%m-%d))" --label "$label" --body-file "$body"
+            fi
+          }
+          if [ "$STALE" = "1" ]; then report price-check "Pricing rows need re-verification" prices.md; fi
+          if [ "$DRIFT" = "1" ]; then report pin-drift "Pinned versions drifted" pins.md; fi
+
+      # Exit 2 is a broken data file or a failed registry lookup, not a finding.
+      - name: Fail on script errors
+        if: steps.prices.outputs.stale == '2' || steps.pins.outputs.drift == '2'
+        run: exit 1
