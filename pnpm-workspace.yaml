@@ -1,2 +1,8 @@
 allowBuilds:
   esbuild: true
+
+# vitepress 1.6.4 (the latest stable) pins vite ^5, and vite 5.x has no fix for
+# GHSA-fx2h-pf6j-xcff, GHSA-v6wh-96g9-6wx3 or GHSA-4w7w-66w2-5vf9. vite 6.4 also
+# moves esbuild past GHSA-67mh-4wv8-2f99. Drop this once vitepress 2 is stable.
+overrides:
+  vite: 6.4.5

@@ -4,7 +4,7 @@
 import vm from "node:vm";
 
 export function inlineScripts(html) {
-   return [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+   return [...html.matchAll(/<script>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
 }
 
 function runInFakeBrowser(source, href) {

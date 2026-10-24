@@ -61,4 +61,6 @@ lychee --no-progress --exclude-all-private --accept 200..=299,403,429 "**/*.md"
 - VitePress compiles Markdown as Vue templates: `{{ }}` outside code and bare `<word>` tags in prose break the build. Inline code is already escaped (`v-pre`) by the config.
 - lychee fails PRs on dead links; accepts 200-299, 403, 429. If a valid URL blocks bots, add a regex to `.lycheeignore` instead of removing the link.
 - `.prettierrc` sets `tabWidth: 3` -- match it, don't normalize.
+- The repo's own workflows pin third-party actions (pnpm/action-setup, astral-sh/setup-uv, lychee-action) to a commit SHA with a `# vX.Y.Z` comment; first-party `actions/*` stay on major tags, as the guides teach. `pnpm check:pins` reports SHA-pin drift from the comment; bump the SHA and the comment together. actionlint in CI is a release tarball checked against `ACTIONLINT_SHA256` in `guides-ci.yml`: bump both with the version.
+- `pnpm-workspace.yaml` overrides vite to 6.4: vitepress 1.6.4 pins vite ^5, which has unpatched advisories. Drop the override once vitepress 2 is stable.
 - CONTRIBUTING rule applies to us too: every command in a guide must be tested on a fresh project before it ships.

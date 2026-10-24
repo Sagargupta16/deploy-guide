@@ -36,7 +36,7 @@ export default async function (t) {
    // Serve dist/ the way GitHub Pages serves a project site: under the repo
    // name, with 404.html as the body of every miss.
    const server = createServer((req, res) => {
-      const path = decodeURIComponent(new URL(req.url, "http://x").pathname);
+      const path = decodeURIComponent(new URL(req.url, "http://127.0.0.1").pathname);
       if (!path.startsWith(BASE)) return send(res, 404, built404, ".html");
       let rel = normalize(path.slice(BASE.length)).replace(/^([/\\])+/, "");
       if (rel === "" || rel === ".") rel = "index.html";
