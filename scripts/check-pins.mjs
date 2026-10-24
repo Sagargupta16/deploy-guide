@@ -19,8 +19,11 @@ const mdOut = argv.includes("--md") ? argv[argv.indexOf("--md") + 1] : null;
 
 const PY_PIN = /^([A-Za-z0-9][A-Za-z0-9_.-]*)(\[[^\]]+\])?==([0-9][^\s;#]*)\s*$/;
 const USES = /uses:\s*["']?([\w.-]+\/[\w.-]+)((?:\/[\w.-]+)*)@([\w.-]+)/g;
+// A SHA pin names its release in a trailing comment: `@<sha> # v6.1.0`.
+const SHA_TAG = /^["']?\s+#\s*(v?\d+(?:\.\d+)*)\b/;
+const tagAfter = (line, m) => SHA_TAG.exec(line.slice(m.index + m[0].length))?.[1];
 
-// One entry per occurrence: { kind, name, pinned, file, line }
+// One entry per occurrence: { kind, name, pinned, tag?, file, line }
 const pins = [];
 
 for (const block of allBlocks()) {
@@ -34,7 +37,7 @@ for (const block of allBlocks()) {
    if (block.lang === "yaml" || block.lang === "yml") {
       lines.forEach((l, i) => {
          for (const m of l.matchAll(USES)) {
-            pins.push({ kind: "action", name: m[1], pinned: m[3], file: block.file, line: block.line + 1 + i });
+            pins.push({ kind: "action", name: m[1], pinned: m[3], tag: tagAfter(l, m), file: block.file, line: block.line + 1 + i });
          }
       });
    }
@@ -46,7 +49,7 @@ for (const f of readdirSync(wfDir).filter((f) => /\.ya?ml$/.test(f))) {
       .split(/\r?\n/)
       .forEach((l, i) => {
          for (const m of l.matchAll(USES)) {
-            pins.push({ kind: "action", name: m[1], pinned: m[3], file: rel(join(wfDir, f)), line: i + 1 });
+            pins.push({ kind: "action", name: m[1], pinned: m[3], tag: tagAfter(l, m), file: rel(join(wfDir, f)), line: i + 1 });
          }
       });
 }
@@ -126,7 +129,12 @@ for (const pin of pins) {
       else if (newer(info.latest, pin.pinned)) rows.push({ ...pin, latest: info.latest, want: info.latest, status: "drift" });
       continue;
    }
-   if (/^[0-9a-f]{40}$/.test(pin.pinned)) continue; // SHA pin: deliberate
+   if (/^[0-9a-f]{40}$/.test(pin.pinned)) {
+      // SHA pin: compare the release in its comment; --write leaves it alone
+      // because the new SHA has to be looked up and checked by hand.
+      if (pin.tag && newer(info.latest, pin.tag)) rows.push({ ...pin, latest: info.latest, status: `drift (SHA pin of ${pin.tag}, bump by hand)` });
+      continue;
+   }
    if (!/^v?\d+(\.\d+)*$/.test(pin.pinned)) {
       rows.push({ ...pin, latest: info.latest, status: `mutable ref @${pin.pinned}` });
       continue;

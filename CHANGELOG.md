@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1] - 2026-10-24
+
+- Security: override vite to 6.4.5 in `pnpm-workspace.yaml`. vitepress 1.6.4, the latest stable, pins vite ^5, and vite 5.x has no fix for GHSA-fx2h-pf6j-xcff, GHSA-v6wh-96g9-6wx3 or GHSA-4w7w-66w2-5vf9; vite 6.4 also moves esbuild from 0.21.5 to 0.25.12 (GHSA-67mh-4wv8-2f99). The site builds and the dev server renders the same pages
+- Security: pin the third-party actions in this repo's workflows to commit SHAs (pnpm/action-setup v6.1.0, astral-sh/setup-uv v10.3.2, lychee-action v2.9.0). `pnpm check:pins` now reads the `# vX.Y.Z` comment after a SHA pin and reports drift against it instead of skipping the pin
+- Security: `docs.yml` grants `pages: write` and `id-token: write` to the deploy job only; the build job gets `contents: read` and `pages: read`
+- Security: CI installs actionlint from the release tarball over HTTPS only and checks its sha256 before running it, instead of piping the download script into bash. The binary now lives in `$RUNNER_TEMP`, not in the checkout
+- Smoke tests: `taskkill` runs from its full System32 path on Windows, the SPA script extractor matches `<SCRIPT>` in any case, and the react-vite test server parses request paths against `http://127.0.0.1` instead of a placeholder host
+
 ## [1.3.0] - 2026-10-18
 
 - Add smoke tests that run five guides the way a reader would (`pnpm smoke <test>`): FastAPI, Flask and Django install their pinned requirements and serve under the platform start command (uvicorn or gunicorn) while the test hits every endpoint; React + Vite builds with the GitHub Pages base path and a deep link survives the 404.html redirect; the GitHub Pages encoder and decoder round-trip a deep link. Guide code blocks opt in with an invisible `<!-- smoke: <test> <file> -->` marker, so the tests read the guide text itself

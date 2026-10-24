@@ -1,6 +1,6 @@
 {
    "name": "deploy-guide",
-   "version": "1.3.0",
+   "version": "1.3.1",
    "private": true,
    "description": "Step-by-step deployment guides for every platform and framework, checked by CI and published as a docs site.",
    "type": "module",

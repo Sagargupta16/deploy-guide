@@ -195,7 +195,8 @@ function freePort() {
 function stopServers() {
    for (const child of servers) {
       if (child.exitCode !== null) continue;
-      if (WIN) spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      // Full path: Windows searches the current directory before PATH.
+      if (WIN) spawnSync(join(process.env.SystemRoot, "System32", "taskkill.exe"), ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
       else {
          try {
             process.kill(-child.pid, "SIGTERM");
